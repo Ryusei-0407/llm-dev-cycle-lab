@@ -48,6 +48,42 @@ test.describe('chat with mocked API @feature-chat', () => {
     await expect(page.getByLabel('Message')).toBeEnabled();
   });
 
+  // Pinned by adversarial review: the Stop button could be deleted outright
+  // without any test noticing. Asserts both spec conditions: visible only
+  // while streaming, and clicking it actually cancels the request.
+  test('stop cancels a streaming response', async ({ page }) => {
+    await page.route('**/api/chat', async (route) => {
+      // Long delay keeps the request in-flight so Stop is observable; the
+      // fulfil below only matters if stop is broken (and is then too late
+      // for the 1.5s assertion, which is the point).
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      await route
+        .fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: sseBody(['too late']),
+        })
+        .catch(() => {}); // request may already be aborted
+    });
+
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Stop' })).toBeHidden();
+    await page.getByLabel('Message').fill('Hello');
+    await page.getByRole('button', { name: 'Send' }).click();
+
+    await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
+    await page.getByRole('button', { name: 'Stop' }).click();
+
+    // Must settle well before the 4s fulfil would end the stream anyway.
+    await expect(page.getByTestId('typing-indicator')).toBeHidden({
+      timeout: 1500,
+    });
+    await expect(page.getByRole('button', { name: 'Stop' })).toBeHidden();
+    // Cancelling is not an error, and the user can immediately send again.
+    await expect(page.getByTestId('error-banner')).toBeHidden();
+    await expect(page.getByLabel('Message')).toBeEnabled();
+  });
+
   test('keeps partial text and shows an error when the stream fails mid-way', async ({
     page,
   }) => {
