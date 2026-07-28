@@ -19,6 +19,17 @@ describe('POST /api/chat', () => {
     expect(res.status).toBe(400);
   });
 
+  // Pinned by adversarial review: removing the JSON try/catch turned this
+  // into a 500 without any test noticing.
+  it('rejects malformed JSON with 400', async () => {
+    const res = await createApp().request('/api/chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{invalid json',
+    });
+    expect(res.status).toBe(400);
+  });
+
   it('returns 500 for the __error__ trigger', async () => {
     const res = await post(createApp(), {
       messages: [{ role: 'user', content: '__error__' }],
