@@ -116,9 +116,11 @@ LLM-as-judge の判定品質。パイプライン自体は @backend レーンで
 
 ### 2.8 Vite 8 + Vite DevTools(検証済み)
 
-- web の dev/build はプロジェクト直下の Vite 8(GA、Rolldown ベース)。`vp` は
-  test / lint / fmt に引き続き使用(`vp dev` は同梱 vite を使うため DevTools が
-  効かない — dev だけ素の `vite` に切り替えた理由)
+- Vite+ のコアはネイティブバイナリで、エンジンは Rolldown ベースの Vite 8 世代
+  (バナーは `VITE+ v0.2.6` とだけ表示され vite バージョンは出ない)。dev/build は
+  `vp` のまま、DevTools プラグインも `vp dev` 配下で動作する
+- `vite@8.1.5` は明示的な devDependency として保持: vitest / plugin-react の
+  peer 解決を単一の Vite 8 に揃えるため(明示しないと古い vite が自動解決される)
 - DevTools は `DEVTOOLS=1`(`dev:devtools` スクリプト)のときだけプラグインを注入。
   E2E・CI のスクリーンショットにパネルが混入しないための環境変数ゲート
 - 接続時にターミナルへ6桁の認証コード(+マジックリンク)が出る。CI や headless では

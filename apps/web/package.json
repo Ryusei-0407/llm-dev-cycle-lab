@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
-    "dev:devtools": "DEVTOOLS=1 vite dev",
-    "build": "tsc --noEmit && vite build",
+    "dev": "vp dev",
+    "dev:devtools": "DEVTOOLS=1 vp dev",
+    "build": "tsc --noEmit && vp build",
     "test": "vp test run",
     "typecheck": "tsc --noEmit"
   },
