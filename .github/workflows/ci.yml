@@ -10,7 +10,7 @@ on:
       - '.github/workflows/**'
 
 permissions:
-  contents: read
+  contents: write # pr-media-comment pushes screenshots/gifs to the ci-media branch
   pull-requests: write
 
 jobs:
@@ -76,3 +76,10 @@ jobs:
         uses: daun/playwright-report-summary@v4
         with:
           report-file: e2e/results.json
+
+      - name: Attach screenshots & recordings to PR comment
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/pr-media-comment.mjs

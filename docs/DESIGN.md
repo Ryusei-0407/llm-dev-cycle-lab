@@ -100,8 +100,14 @@ LLM-as-judge の判定品質。パイプライン自体は @backend レーンで
 
 ### 2.7 PR可視化(無料・OSS構成)
 
-- 失敗時のみ trace/動画/スクショ記録 → HTMLレポート artifact 化
+- CI では全テストで動画+最終スクショを記録(スイートが小さいため。時間バジェットを
+  圧迫し始めたら失敗時のみに戻す)、trace は on-first-retry のまま
 - `daun/playwright-report-summary@v4` で PRコメントにサマリ(同一コメント更新)
+- **メディアコメント**(`scripts/pr-media-comment.mjs`): GitHub にはコメントへの
+  添付アップロード API が無いため、動画を GIF 化し `ci-media` ブランチにコミットして
+  URL 参照でコメントに埋め込む(テストごとに折りたたみ表示、PR毎に直近3run分のみ保持)。
+  private リポジトリでは camo プロキシの制約でインライン表示不可のため自動で
+  クリックスルー方式に切り替わる(public 化すればインライン表示)
 - 発展: HTMLレポートの GitHub Pages デプロイ(run毎パス)で「2クリックで動画到達」、
   UI差分は `reg-viz/reg-actions`(外部ストレージ不要)
 - 注意: トレース/レポートには認証情報が含まれ得る。公開範囲に留意
