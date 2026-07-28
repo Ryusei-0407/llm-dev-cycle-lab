@@ -100,7 +100,7 @@ for (const test of tests) {
       file,
       label: a.name.startsWith('stage: ')
         ? a.name.slice('stage: '.length)
-        : 'on failure',
+        : '失敗時点(自動撮影)',
     });
   });
   if (ffmpeg) {
@@ -163,23 +163,41 @@ function buildComment() {
   const blobBase = `https://github.com/${repo}/blob/${MEDIA_BRANCH}`;
   const toRepoPath = (file) => `${destPrefix}/${path.relative(outDir, file)}`;
   const icon = { passed: '✅', expected: '✅', failed: '❌', unexpected: '❌', flaky: '⚠️', skipped: '⏭️' };
+  const isFailure = (t) => t.status === 'failed' || t.status === 'unexpected';
 
-  let md = `${MARKER}\n### 🎬 E2E evidence (screenshots & recordings)\n\n`;
-  for (const test of tests) {
+  const failed = tests.filter(isFailure).length;
+  const flaky = tests.filter((t) => t.status === 'flaky').length;
+  const passed = tests.length - failed - flaky;
+  const totalSec = (tests.reduce((sum, t) => sum + t.durationMs, 0) / 1000).toFixed(1);
+
+  let md = `${MARKER}\n## 🎬 E2E 実行証跡(録画・画面遷移)\n\n`;
+  md += `**✅ ${passed} 成功**`;
+  if (failed) md += ` · **❌ ${failed} 失敗**`;
+  if (flaky) md += ` · **⚠️ ${flaky} flaky**`;
+  md += ` · 合計 ${totalSec}s`;
+  md += ` · [CI run](https://github.com/${repo}/actions/runs/${runId})\n\n`;
+  md += `各テストを開くと、実行全体の録画と、操作段階ごとのスクリーンショットが見られます。\n\n`;
+
+  // 失敗したテストを先頭に(証跡が最も必要なものから)
+  const ordered = [...tests].sort((a, b) => Number(isFailure(b)) - Number(isFailure(a)));
+  for (const test of ordered) {
     const media = test.media ?? { screenshots: [], gifs: [] };
-    md += `<details><summary>${icon[test.status] ?? '❔'} ${test.title} <em>(${(test.durationMs / 1000).toFixed(1)}s)</em></summary>\n\n`;
+    md += `<details${isFailure(test) ? ' open' : ''}><summary>${icon[test.status] ?? '❔'} <b>${test.title}</b> <em>(${(test.durationMs / 1000).toFixed(1)}s)</em></summary>\n\n`;
     if (media.screenshots.length === 0 && media.gifs.length === 0) {
-      md += `_no media captured_\n`;
+      md += `_このテストのメディアはありません_\n`;
     }
     for (const file of media.gifs) {
-      md += `![recording](${blobBase}/${toRepoPath(file)}?raw=true)\n\n`;
+      md += `#### 📹 実行の録画\n\n![録画](${blobBase}/${toRepoPath(file)}?raw=true)\n\n`;
     }
-    for (const { file, label } of media.screenshots) {
-      md += `**${label}**\n\n![${label}](${blobBase}/${toRepoPath(file)}?raw=true)\n\n`;
+    if (media.screenshots.length > 0) {
+      md += `#### 🖼️ 画面の遷移(操作順)\n\n`;
+      media.screenshots.forEach(({ file, label }, i) => {
+        md += `**Step ${i + 1}: ${label}**\n\n![${label}](${blobBase}/${toRepoPath(file)}?raw=true)\n\n`;
+      });
     }
     md += `</details>\n\n`;
   }
-  md += `<sub>media branch: [\`${MEDIA_BRANCH}/${destPrefix}\`](${blobBase}/${destPrefix}) · run [${runId}](https://github.com/${repo}/actions/runs/${runId})</sub>\n`;
+  md += `<sub>画像の保存先: [\`${MEDIA_BRANCH}\` ブランチ](${blobBase}/${destPrefix})(PRごとに直近${KEEP_RUNS_PER_PR}run分を保持) · run [${runId}](https://github.com/${repo}/actions/runs/${runId})</sub>\n`;
   return md;
 }
 

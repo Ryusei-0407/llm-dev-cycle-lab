@@ -26,7 +26,7 @@ test.describe('chat with mocked API @feature-chat', () => {
 
     await test.step('load the app', async () => {
       await page.goto('/');
-      await snap(page, testInfo, 'initial');
+      await snap(page, testInfo, '初期表示');
     });
 
     await test.step('send a message', async () => {
@@ -34,7 +34,7 @@ test.describe('chat with mocked API @feature-chat', () => {
       await page.getByRole('button', { name: 'Send' }).click();
       await expect(page.getByTestId('message-user')).toContainText('Hello');
       await expect(page.getByTestId('typing-indicator')).toBeVisible();
-      await snap(page, testInfo, 'streaming');
+      await snap(page, testInfo, 'ストリーミング中');
     });
 
     await test.step('receive the streamed reply', async () => {
@@ -43,7 +43,7 @@ test.describe('chat with mocked API @feature-chat', () => {
         'Hello from the mock!',
       );
       await expect(page.getByTestId('error-banner')).toBeHidden();
-      await snap(page, testInfo, 'reply rendered');
+      await snap(page, testInfo, '応答表示');
     });
 
     // 構造アサーション: 応答内容が変わっても維持されるべき role と順序だけを固定する
@@ -68,7 +68,7 @@ test.describe('chat with mocked API @feature-chat', () => {
 
     await test.step('load the app', async () => {
       await page.goto('/');
-      await snap(page, testInfo, 'initial');
+      await snap(page, testInfo, '初期表示');
     });
 
     await test.step('send a message that fails', async () => {
@@ -81,7 +81,7 @@ test.describe('chat with mocked API @feature-chat', () => {
       await expect(page.getByTestId('message-assistant')).toHaveCount(0);
       // 失敗後もユーザーがすぐ再送できる状態であること
       await expect(page.getByLabel('Message')).toBeEnabled();
-      await snap(page, testInfo, 'error shown');
+      await snap(page, testInfo, 'エラー表示');
     });
 
     await expect(page.locator('main')).toMatchAriaSnapshot(`
@@ -111,7 +111,7 @@ test.describe('chat with mocked API @feature-chat', () => {
 
     await test.step('load the app', async () => {
       await page.goto('/');
-      await snap(page, testInfo, 'initial');
+      await snap(page, testInfo, '初期表示');
       await expect(page.getByRole('button', { name: 'Stop' })).toBeHidden();
     });
 
@@ -119,7 +119,7 @@ test.describe('chat with mocked API @feature-chat', () => {
       await page.getByLabel('Message').fill('Hello');
       await page.getByRole('button', { name: 'Send' }).click();
       await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
-      await snap(page, testInfo, 'streaming, stop available');
+      await snap(page, testInfo, 'ストリーミング中(Stopボタン表示)');
     });
 
     await test.step('stop the stream', async () => {
@@ -132,7 +132,7 @@ test.describe('chat with mocked API @feature-chat', () => {
       // 停止はエラーではない(バナーを出さず、すぐ再送できる)
       await expect(page.getByTestId('error-banner')).toBeHidden();
       await expect(page.getByLabel('Message')).toBeEnabled();
-      await snap(page, testInfo, 'stopped');
+      await snap(page, testInfo, '停止後');
     });
   });
 
@@ -149,7 +149,7 @@ test.describe('chat with mocked API @feature-chat', () => {
 
     await test.step('load the app', async () => {
       await page.goto('/');
-      await snap(page, testInfo, 'initial');
+      await snap(page, testInfo, '初期表示');
     });
 
     await test.step('stream fails mid-way', async () => {
@@ -157,7 +157,7 @@ test.describe('chat with mocked API @feature-chat', () => {
       await page.getByRole('button', { name: 'Send' }).click();
       await expect(page.getByTestId('message-assistant')).toContainText('Partial');
       await expect(page.getByTestId('error-banner')).toBeVisible();
-      await snap(page, testInfo, 'partial text with error');
+      await snap(page, testInfo, '部分応答とエラー表示');
     });
   });
 });

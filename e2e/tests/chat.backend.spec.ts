@@ -16,14 +16,14 @@ test.describe('chat against the real backend @backend @feature-chat', () => {
   }, testInfo) => {
     await test.step('load the app', async () => {
       await page.goto('/');
-      await snap(page, testInfo, 'initial');
+      await snap(page, testInfo, '初期表示');
     });
 
     await test.step('send a message', async () => {
       await page.getByLabel('Message').fill('Hello backend');
       await page.getByRole('button', { name: 'Send' }).click();
       await expect(page.getByTestId('typing-indicator')).toBeVisible();
-      await snap(page, testInfo, 'streaming');
+      await snap(page, testInfo, 'ストリーミング中');
     });
 
     await test.step('receive a reply', async () => {
@@ -32,7 +32,7 @@ test.describe('chat against the real backend @backend @feature-chat', () => {
       });
       await expect(page.getByTestId('message-assistant')).not.toBeEmpty();
       await expect(page.getByTestId('error-banner')).toBeHidden();
-      await snap(page, testInfo, 'reply rendered');
+      await snap(page, testInfo, '応答表示');
     });
 
     // 構造アサーション: 応答が非決定的でも成立する検証のみ(role と順序)
@@ -47,7 +47,7 @@ test.describe('chat against the real backend @backend @feature-chat', () => {
   test('surfaces a provider failure as an error banner', async ({ page }, testInfo) => {
     await test.step('load the app', async () => {
       await page.goto('/');
-      await snap(page, testInfo, 'initial');
+      await snap(page, testInfo, '初期表示');
     });
 
     await test.step('trigger a provider failure', async () => {
@@ -55,7 +55,7 @@ test.describe('chat against the real backend @backend @feature-chat', () => {
       await page.getByRole('button', { name: 'Send' }).click();
       await expect(page.getByTestId('error-banner')).toBeVisible();
       await expect(page.getByLabel('Message')).toBeEnabled();
-      await snap(page, testInfo, 'error shown');
+      await snap(page, testInfo, 'エラー表示');
     });
   });
 });

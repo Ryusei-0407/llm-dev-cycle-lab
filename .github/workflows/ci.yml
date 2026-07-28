@@ -5,6 +5,7 @@ on:
     paths:
       - 'apps/**'
       - 'e2e/**'
+      - 'scripts/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/**'
