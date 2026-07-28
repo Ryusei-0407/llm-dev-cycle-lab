@@ -1,0 +1,57 @@
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0 auto;
+  max-width: 640px;
+  padding: 1rem;
+}
+
+[data-testid='message-list'] {
+  list-style: none;
+  padding: 0;
+}
+
+[data-testid='message-list'] li {
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+}
+
+li.user {
+  background: #e3f2fd;
+}
+
+li.assistant {
+  background: #f5f5f5;
+}
+
+li .role {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+[data-testid='error-banner'] {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  border-radius: 8px;
+  color: #b71c1c;
+  padding: 0.5rem 0.75rem;
+}
+
+[data-testid='typing-indicator'] {
+  color: #757575;
+  font-style: italic;
+  padding: 0.25rem 0;
+}
+
+form {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+form input {
+  flex: 1;
+  padding: 0.5rem;
+}

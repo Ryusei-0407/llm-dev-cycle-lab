@@ -1,0 +1,22 @@
+{
+  "name": "llm-dev-cycle-lab",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @app/api",
+    "dev:web": "npm run dev -w @app/web",
+    "test:unit": "npm run test --workspaces",
+    "e2e": "playwright test -c e2e/playwright.config.ts",
+    "e2e:smoke": "playwright test -c e2e/playwright.config.ts --grep @smoke",
+    "e2e:perf": "PW_TRACE=on playwright test -c e2e/playwright.config.ts",
+    "analyze:traces": "node scripts/analyze-trace.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.0"
+  }
+}

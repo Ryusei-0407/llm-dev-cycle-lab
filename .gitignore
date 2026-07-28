@@ -1,0 +1,9 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+e2e/results.json
+.claude/tdd-gate
+.trace-analysis/
+*.log
+.DS_Store

@@ -1,0 +1,57 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 18 * * *' # 03:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Full suite including @backend (full-stack) tests.
+  # When a real LLM provider is wired in, set LLM_PROVIDER + API key here —
+  # this job becomes the real-LLM smoke lane without touching any test code.
+  full:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run full E2E (quarantine excluded from gate)
+        run: npx playwright test -c e2e/playwright.config.ts --grep-invert "@quarantine"
+      - name: Upload report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-report
+          path: e2e/playwright-report/
+          retention-days: 14
+
+  # Perf lane: record traces for every test; the trace-analyst skill consumes
+  # the artifact locally (gh run download --name perf-traces).
+  perf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run E2E with full tracing
+        env:
+          PW_TRACE: 'on'
+        run: npx playwright test -c e2e/playwright.config.ts --grep-invert "@quarantine"
+      - name: Upload traces for local analysis
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-traces
+          path: e2e/test-results/
+          retention-days: 14
