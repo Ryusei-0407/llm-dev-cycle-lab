@@ -38,7 +38,7 @@ function stubStreamingFetch() {
 
 test("renders each streamed chunk as it arrives", async () => {
   const upstream = stubStreamingFetch();
-  render(<App />);
+  await render(<App />);
 
   await page.getByLabelText("Message").fill("Hello");
   await page.getByRole("button", { name: "Send" }).click();

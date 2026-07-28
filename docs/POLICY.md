@@ -74,6 +74,7 @@ Playwright と Vite+(バンドルされた Vitest 4 / oxlint / oxfmt)の機能�
 
 | 状況                     | コマンド                                                            |
 | ------------------------ | ------------------------------------------------------------------- |
+| 編集直後の最速検証(1秒)  | `pnpm check`(fmt + lint + 型を一括)                                 |
 | ロジック変更後の最速確認 | `pnpm test:unit`                                                    |
 | 機能単位のE2E            | `pnpm e2e --grep @feature-<name>`                                   |
 | 直前の失敗だけ再実行     | `pnpm e2e --last-failed`                                            |

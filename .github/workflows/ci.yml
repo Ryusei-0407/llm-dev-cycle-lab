@@ -27,9 +27,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm fmt:check
-      - run: pnpm lint
-      - run: pnpm -r typecheck
+      - run: pnpm check # vp check: fmt + lint + type check (tsgo) in one pass
 
   # Runs node unit tests AND Vitest Browser Mode component tests,
   # so it needs chromium too (shared cache with the e2e job).
