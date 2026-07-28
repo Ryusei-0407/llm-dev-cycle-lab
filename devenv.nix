@@ -28,5 +28,12 @@
       files = "\\.(ts|tsx|js|jsx|mjs)$";
       pass_filenames = true;
     };
+    verify-conventions = {
+      enable = true;
+      name = "verify-conventions (POLICY rules)";
+      entry = "node scripts/verify-conventions.mjs";
+      files = "\\.(ts|tsx)$";
+      pass_filenames = false;
+    };
   };
 }

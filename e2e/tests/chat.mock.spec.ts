@@ -86,7 +86,7 @@ test.describe("chat with mocked API @feature-chat", () => {
     `);
   });
 
-  test("stop cancels a streaming response", async ({ page }, testInfo) => {
+  test("stop cancels a streaming response @pinned", async ({ page }, testInfo) => {
     await page.route("**/api/chat", async (route) => {
       // Long delay keeps the request in-flight so Stop is observable; the
       // fulfil below only matters if stop is broken (and is then too late
