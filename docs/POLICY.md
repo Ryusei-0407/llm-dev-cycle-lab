@@ -46,6 +46,18 @@ LLMへの「お願い」は忘れられる。守らせたいものは構造(hook
 
 迷ったら上の層(速い方)へ。下の層は上の層で書けない検証だけを持つ。
 
+**共通規約**(全層):
+
+- 固定待ち(`waitForTimeout`)禁止。web-first assertion / `expect.element` を使う
+- セレクタは `data-testid` / ロール優先
+- E2E はフェーズを `test.step` で構造化し、状態遷移ごとに `snap()`(e2e/helpers/snap.ts)で
+  ラベル付きスクショを撮る。最終状態に `toMatchAriaSnapshot`(role と順序のみ)を1枚置く
+- E2E 本数は機能につき正常1+失敗2まで。失敗系は「UIに専用ハンドリングがある失敗」のみ。
+  反証フェーズで固定されたテストは上限に数えない
+- タグ: `@feature-<name>`(必須)/ `@smoke`(主経路)/ `@backend`(nightly)/
+  `@component`(CT)/ `@quarantine`(flaky隔離、nightlyのみ・ゲート外)
+- 接続情報・環境依存の値をテストコードに書かない(設定・環境変数で差し替え可能に保つ)
+
 ### 5. 人間向け可視化は証跡から自動生成する
 
 PRメディアコメント(録画GIF・段階スクショ)、サマリコメント、Job Summary は
