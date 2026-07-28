@@ -72,14 +72,21 @@ const outDir = "e2e/media-out";
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
 
-// Needs a real ffmpeg on PATH (CI installs it via apt). Playwright's bundled
+// Prefers system ffmpeg (devenv provides it locally), falling back to the
+// binary shipped in @ffmpeg-installer/ffmpeg — network-independent in CI,
+// unlike apt (observed a 22-minute mirror stall). Playwright's bundled
 // ffmpeg is no substitute: it is a minimal build without a GIF encoder.
 let ffmpeg = "ffmpeg";
 try {
   sh(ffmpeg, ["-version"]);
 } catch {
-  ffmpeg = null;
-  console.error("ffmpeg not found — recordings will be skipped.");
+  try {
+    ffmpeg = (await import("@ffmpeg-installer/ffmpeg")).default.path;
+    sh(ffmpeg, ["-version"]);
+  } catch {
+    ffmpeg = null;
+    console.error("ffmpeg not found — recordings will be skipped.");
+  }
 }
 
 for (const test of tests) {

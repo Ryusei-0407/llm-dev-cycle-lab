@@ -1,6 +1,8 @@
 packages:
   - apps/*
 allowBuilds:
+  "@ffmpeg-installer/darwin-arm64": true
+  "@ffmpeg-installer/linux-x64": true
   esbuild: true
 # vite-plus (0.2.x) bundles its own vitest/vite; pnpm's isolated layout splits
 # @vitest/browser onto a second vite instance and breaks browser mode.

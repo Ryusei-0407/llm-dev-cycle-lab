@@ -140,9 +140,6 @@ jobs:
         with:
           report-file: e2e/results.json
 
-      - name: Install ffmpeg (gif conversion for PR media)
-        if: ${{ !cancelled() }}
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: Attach screenshots & recordings to PR comment
         if: ${{ !cancelled() }}
         env:
