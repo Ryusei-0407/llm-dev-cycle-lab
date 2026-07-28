@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { App } from './App';
+import { useState } from "react";
+import { App } from "./App";
 
 declare global {
   interface Window {
@@ -21,18 +21,16 @@ export const StalledStream = () => {
     });
     window.__stream = {
       push: (delta: string) =>
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`),
-        ),
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`)),
       done: () => {
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },
     };
     window.fetch = async () =>
       new Response(stream, {
         status: 200,
-        headers: { 'content-type': 'text/event-stream' },
+        headers: { "content-type": "text/event-stream" },
       });
     return true;
   });

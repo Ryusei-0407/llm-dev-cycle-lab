@@ -1,6 +1,6 @@
-import { useCallback, useReducer, useRef, useState } from 'react';
-import { createSSEParser } from './parseSSE';
-import { chatReducer, initialState } from './reducer';
+import { useCallback, useReducer, useRef, useState } from "react";
+import { createSSEParser } from "./parseSSE";
+import { chatReducer, initialState } from "./reducer";
 
 export const SLOW_HINT_MS = 10_000;
 
@@ -12,24 +12,24 @@ export function useChat() {
   const abortRef = useRef<AbortController | null>(null);
 
   const send = useCallback(async (content: string) => {
-    if (stateRef.current.status === 'streaming') return;
-    const history = stateRef.current.messages.filter((m) => m.content !== '');
-    dispatch({ type: 'start', content });
+    if (stateRef.current.status === "streaming") return;
+    const history = stateRef.current.messages.filter((m) => m.content !== "");
+    dispatch({ type: "start", content });
     const controller = new AbortController();
     abortRef.current = controller;
     const slowTimer = setTimeout(() => setSlowHint(true), SLOW_HINT_MS);
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          messages: [...history, { role: 'user', content }],
+          messages: [...history, { role: "user", content }],
         }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {
-        dispatch({ type: 'error', message: `request failed (${res.status})` });
+        dispatch({ type: "error", message: `request failed (${res.status})` });
         return;
       }
       const reader = res.body.getReader();
@@ -39,23 +39,23 @@ export function useChat() {
         const { done, value } = await reader.read();
         if (done) break;
         for (const event of parser.feed(decoder.decode(value, { stream: true }))) {
-          if (event === 'DONE') {
-            dispatch({ type: 'done' });
+          if (event === "DONE") {
+            dispatch({ type: "done" });
             return;
           }
-          if ('delta' in event) {
-            dispatch({ type: 'delta', delta: event.delta });
+          if ("delta" in event) {
+            dispatch({ type: "delta", delta: event.delta });
           } else {
-            dispatch({ type: 'error', message: event.error });
+            dispatch({ type: "error", message: event.error });
             return;
           }
         }
       }
       // Stream closed without [DONE]: treat as complete rather than lose text.
-      dispatch({ type: 'done' });
+      dispatch({ type: "done" });
     } catch {
-      if (controller.signal.aborted) dispatch({ type: 'stop' });
-      else dispatch({ type: 'error', message: 'network error' });
+      if (controller.signal.aborted) dispatch({ type: "stop" });
+      else dispatch({ type: "error", message: "network error" });
     } finally {
       clearTimeout(slowTimer);
       setSlowHint(false);

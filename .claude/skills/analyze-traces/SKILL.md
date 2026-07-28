@@ -10,7 +10,7 @@ description: Playwright のトレースから実装の性能問題・不健全�
 ローカルで取る場合:
 
 ```bash
-npm run e2e:perf        # PW_TRACE=on で全テストのトレースを記録
+pnpm e2e:perf        # PW_TRACE=on で全テストのトレースを記録
 ```
 
 CI(nightly perf レーン)の成果物を取る場合:

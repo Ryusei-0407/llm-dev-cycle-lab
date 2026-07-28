@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+allowBuilds:
+  esbuild: true
+# vite-plus (0.2.x) bundles its own vitest/vite; pnpm's isolated layout splits
+# @vitest/browser onto a second vite instance and breaks browser mode.
+# Hoisted layout restores npm-compatible resolution until upstream supports it.
+nodeLinker: hoisted

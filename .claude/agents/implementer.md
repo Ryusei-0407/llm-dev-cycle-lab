@@ -15,6 +15,6 @@ isolation: worktree
 `apps/*/test*/**`)を変更しない。** テストが間違っていると思う場合も変更せず、
 完了報告で理由を添えて指摘する(裁定はメインセッションが行う)。
 
-`npm run test:unit` とモック系E2E(`npm run e2e -- --grep-invert @backend`)が
+`pnpm test:unit` とモック系E2E(`pnpm e2e --grep-invert @backend`)が
 グリーンになったら、変更ファイルの要点・テスト実行結果・テスト側の問題だと
 判断した点だけを簡潔に報告してください。

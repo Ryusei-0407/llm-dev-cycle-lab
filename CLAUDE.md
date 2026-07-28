@@ -8,10 +8,10 @@ LLM駆動開発の「実装 → テスト → E2E」サイクルを検証する�
 
 ## コマンド
 
-- `npm run test:unit` — ユニット + Vitest Browser Mode(実chromium)の両方が走る
-- `npm run e2e` / `npm run e2e -- --grep @feature-<name>` / `npm run e2e -- --last-failed`
-- `npm run e2e:perf` → `npm run analyze:traces` — trace 全記録と機械解析
-- dev サーバは Playwright が自動起動(手動なら `npm run dev:api` + `npm run dev:web`)
+- `pnpm test:unit` — ユニット + Vitest Browser Mode(実chromium)の両方が走る
+- `pnpm e2e` / `pnpm e2e --grep @feature-<name>` / `pnpm e2e --last-failed`
+- `pnpm e2e:perf` → `pnpm analyze:traces` — trace 全記録と機械解析
+- dev サーバは Playwright が自動起動(手動なら `pnpm dev:api` + `pnpm dev:web`)
 
 ## 作業スタイル
 

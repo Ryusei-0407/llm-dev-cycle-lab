@@ -5,12 +5,12 @@ body {
   padding: 1rem;
 }
 
-[data-testid='message-list'] {
+[data-testid="message-list"] {
   list-style: none;
   padding: 0;
 }
 
-[data-testid='message-list'] li {
+[data-testid="message-list"] li {
   border-radius: 8px;
   margin: 0.5rem 0;
   padding: 0.5rem 0.75rem;
@@ -31,7 +31,7 @@ li .role {
   opacity: 0.6;
 }
 
-[data-testid='error-banner'] {
+[data-testid="error-banner"] {
   background: #ffebee;
   border: 1px solid #ef9a9a;
   border-radius: 8px;
@@ -39,7 +39,7 @@ li .role {
   padding: 0.5rem 0.75rem;
 }
 
-[data-testid='typing-indicator'] {
+[data-testid="typing-indicator"] {
   color: #757575;
   font-style: italic;
   padding: 0.25rem 0;

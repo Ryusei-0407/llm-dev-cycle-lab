@@ -12,7 +12,7 @@
 全検証はワンコマンドで実行でき、結果は構造化された形式(results.json、exit code、
 grep可能な出力)で得られること。
 
-- `npm run test:unit` / `npm run e2e -- --grep @feature-x` / `npm run e2e -- --last-failed`
+- `pnpm test:unit` / `pnpm e2e --grep @feature-x` / `pnpm e2e --last-failed`
 - PRレーン5分以内・fail fast(`--max-failures=5`)は人間のためではなく、
   エージェントの修正ループを速くするための制約でもある
 
@@ -35,14 +35,14 @@ LLMへの「お願い」は忘れられる。守らせたいものは構造(hook
 
 ### 4. テストは層で分け、各層の責務を越えない
 
-| 層 | 実行 | 対象 | 判定基準 |
-|---|---|---|---|
-| unit | `vp test`(node) | 純ロジック(パーサ、reducer、APIルート) | ブラウザ不要ならここ。最速 |
-| component / **Vitest Browser Mode** | `vp test`(chromium) | 実ブラウザでしか検証できないコンポーネント挙動: ストリーミング逐次描画、スクロール、フォーカス | **componentテストのデフォルト**。fetch はページ内スタブ(`vi.stubGlobal`) |
-| component / **Playwright CT**(stories & galleries) | `npm run e2e -- --project=components` | BMでは不可能・不安定なもの**のみ**: `page.clock`(実タイマー制御)、`page.route`、video/trace 証跡が必要な場合、マルチフレーム | 例外レイヤ。story(`src/*.story.tsx`)が環境を所有し、テストはページ越しに観測する |
-| E2E | `npm run e2e`(chromium project) | ユーザーストーリーの配管(送信→表示→完了→エラー) | 機能につき正常1+失敗2まで(反証固定テストは例外)。内容でなく構造をアサート(aria snapshot) |
-| @backend | nightly | 実バックエンド結合 → 将来は実LLMスモーク | 構造的アサーションのみ |
-| evals | 未導入 | LLM出力の品質 | E2Eに品質検証を混ぜない |
+| 層                                                 | 実行                            | 対象                                                                                                                         | 判定基準                                                                                 |
+| -------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| unit                                               | `vp test`(node)                 | 純ロジック(パーサ、reducer、APIルート)                                                                                       | ブラウザ不要ならここ。最速                                                               |
+| component / **Vitest Browser Mode**                | `vp test`(chromium)             | 実ブラウザでしか検証できないコンポーネント挙動: ストリーミング逐次描画、スクロール、フォーカス                               | **componentテストのデフォルト**。fetch はページ内スタブ(`vi.stubGlobal`)                 |
+| component / **Playwright CT**(stories & galleries) | `pnpm e2e --project=components` | BMでは不可能・不安定なもの**のみ**: `page.clock`(実タイマー制御)、`page.route`、video/trace 証跡が必要な場合、マルチフレーム | 例外レイヤ。story(`src/*.story.tsx`)が環境を所有し、テストはページ越しに観測する         |
+| E2E                                                | `pnpm e2e`(chromium project)    | ユーザーストーリーの配管(送信→表示→完了→エラー)                                                                              | 機能につき正常1+失敗2まで(反証固定テストは例外)。内容でなく構造をアサート(aria snapshot) |
+| @backend                                           | nightly                         | 実バックエンド結合 → 将来は実LLMスモーク                                                                                     | 構造的アサーションのみ                                                                   |
+| evals                                              | 未導入                          | LLM出力の品質                                                                                                                | E2Eに品質検証を混ぜない                                                                  |
 
 迷ったら上の層(速い方)へ。下の層は上の層で書けない検証だけを持つ。
 
@@ -72,11 +72,11 @@ Playwright と Vite+(バンドルされた Vitest 4 / oxlint / oxfmt)の機能�
 
 ## エージェントの開発ループ(推奨コマンド)
 
-| 状況 | コマンド |
-|---|---|
-| ロジック変更後の最速確認 | `npm run test:unit` |
-| 機能単位のE2E | `npm run e2e -- --grep @feature-<name>` |
-| 直前の失敗だけ再実行 | `npm run e2e -- --last-failed` |
-| 対話的デバッグ(人間) | `npx playwright test --ui`(タグフィルタ+watch+タイムトラベル) |
-| trace の機械解析 | `npm run e2e:perf && npm run analyze:traces` |
-| 失敗 trace の目視 | `npx playwright show-trace e2e/test-results/<dir>/trace.zip` |
+| 状況                     | コマンド                                                            |
+| ------------------------ | ------------------------------------------------------------------- |
+| ロジック変更後の最速確認 | `pnpm test:unit`                                                    |
+| 機能単位のE2E            | `pnpm e2e --grep @feature-<name>`                                   |
+| 直前の失敗だけ再実行     | `pnpm e2e --last-failed`                                            |
+| 対話的デバッグ(人間)     | `pnpm exec playwright test --ui`(タグフィルタ+watch+タイムトラベル) |
+| trace の機械解析         | `pnpm e2e:perf && pnpm analyze:traces`                              |
+| 失敗 trace の目視        | `pnpm exec playwright show-trace e2e/test-results/<dir>/trace.zip`  |

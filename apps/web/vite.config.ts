@@ -1,6 +1,6 @@
-import { playwright } from '@vitest/browser-playwright';
-import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite-plus';
+import { playwright } from "@vitest/browser-playwright";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   plugins: [react()],
@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      '/api': 'http://localhost:8787',
+      "/api": "http://localhost:8787",
     },
   },
   test: {
@@ -17,9 +17,9 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          name: 'unit',
-          environment: 'node',
-          include: ['test/**/*.test.ts'],
+          name: "unit",
+          environment: "node",
+          include: ["test/**/*.test.ts"],
         },
       },
       // Component layer: real-browser behaviour JSDOM cannot reproduce
@@ -28,13 +28,13 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          name: 'browser',
-          include: ['test-browser/**/*.test.tsx'],
+          name: "browser",
+          include: ["test-browser/**/*.test.tsx"],
           browser: {
             enabled: true,
             headless: true,
             provider: playwright(),
-            instances: [{ browser: 'chromium' }],
+            instances: [{ browser: "chromium" }],
           },
         },
       },
