@@ -31,6 +31,6 @@ npx playwright install chromium
 
 ## Claude Code ワークフロー
 
-- `/dev-cycle` — 機能開発サイクル(仕様化 → test-writer / implementer を worktree 並列 → 機能単位で E2E まで完了)
+- `/dev-cycle` — 機能開発サイクル(仕様化 → test-writer / implementer を worktree 並列 → 機能単位で E2E まで完了 → adversarial-reviewer による反証フェーズ)
 - `/analyze-traces` — nightly perf レーンのトレースから改善タスクを抽出
 - Stop hook(TDD ゲート): `touch .claude/tdd-gate` で「ユニットテスト全グリーンまでターン終了不可」を有効化
