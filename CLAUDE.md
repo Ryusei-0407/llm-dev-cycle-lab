@@ -8,6 +8,7 @@ LLM駆動開発の「実装 → テスト → E2E」サイクルを検証する�
 
 ## コマンド
 
+- `pnpm check` — fmt + lint + 型チェックを一括(vp check、1秒以内)。編集後はまずこれ
 - `pnpm test:unit` — ユニット + Vitest Browser Mode(実chromium)の両方が走る
 - `pnpm e2e` / `pnpm e2e --grep @feature-<name>` / `pnpm e2e --last-failed`
 - `pnpm e2e:perf` → `pnpm analyze:traces` — trace 全記録と機械解析

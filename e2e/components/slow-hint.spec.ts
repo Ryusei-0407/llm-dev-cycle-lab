@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
 
+// The story (apps/web/src/App.story.tsx) exposes this hook; the e2e TS
+// program cannot see the story's declaration, so it is re-declared here.
+declare global {
+  interface Window {
+    __stream: { push(delta: string): void; done(): void };
+  }
+}
+
 // Component test (Playwright stories & galleries). This lives here, not in
 // Vitest Browser Mode, because it needs page.clock — the 10s slow-hint timer
 // must be driven deterministically, and Playwright's clock replaces timers at
