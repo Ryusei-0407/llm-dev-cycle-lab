@@ -104,10 +104,12 @@ LLM-as-judge の判定品質。パイプライン自体は @backend レーンで
   圧迫し始めたら失敗時のみに戻す)、trace は on-first-retry のまま
 - `daun/playwright-report-summary@v4` で PRコメントにサマリ(同一コメント更新)
 - **メディアコメント**(`scripts/pr-media-comment.mjs`): GitHub にはコメントへの
-  添付アップロード API が無いため、動画を GIF 化し `ci-media` ブランチにコミットして
-  URL 参照でコメントに埋め込む(テストごとに折りたたみ表示、PR毎に直近3run分のみ保持)。
-  private リポジトリでは camo プロキシの制約でインライン表示不可のため自動で
-  クリックスルー方式に切り替わる(public 化すればインライン表示)
+  添付アップロード API が無い(2026年7月現在も未実装)ため、動画を GIF 化し
+  `ci-media` ブランチにコミットし、同一リポジトリの blob URL + `?raw=true` で
+  コメントに埋め込む(reg-actions と同方式)。この形式は private リポジトリでも
+  権限のある閲覧者にはインライン表示される(GitHub がレンダリング時に短命JWT付き
+  URL へ書き換える)。camo で壊れるのは外部ドメイン画像の場合のみ。
+  テストごとに折りたたみ表示、PR毎に直近3run分のみ保持
 - 発展: HTMLレポートの GitHub Pages デプロイ(run毎パス)で「2クリックで動画到達」、
   UI差分は `reg-viz/reg-actions`(外部ストレージ不要)
 - 注意: トレース/レポートには認証情報が含まれ得る。公開範囲に留意

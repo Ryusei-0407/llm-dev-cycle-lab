@@ -3,10 +3,11 @@
 // recordings from a Playwright run.
 //
 // GitHub has no API to upload attachments to comments, so media is committed
-// to a dedicated `ci-media` branch of this repo and referenced by URL.
-// Videos are converted to GIF (comments cannot embed video URLs). On private
-// repos raw URLs do not render inline (camo proxy cannot authenticate), so
-// the comment degrades to click-through links automatically.
+// to a dedicated `ci-media` branch of this repo and embedded via same-repo
+// blob URLs with ?raw=true — GitHub rewrites those to short-lived signed URLs
+// at render time, so they display inline even on private repos (the approach
+// reg-viz/reg-actions uses). Videos are converted to GIF (comments cannot
+// embed video URLs).
 //
 // Usage:
 //   node scripts/pr-media-comment.mjs             # CI: convert, push, comment
@@ -144,16 +145,14 @@ function publishMedia() {
 }
 
 // ---- 4. Build the comment ----
-function buildComment(isPrivate) {
-  const rawBase = `https://raw.githubusercontent.com/${repo}/${MEDIA_BRANCH}`;
+function buildComment() {
+  // Same-repo blob URLs with ?raw=true render inline even on private repos:
+  // GitHub rewrites them to short-lived signed URLs for authorized viewers.
   const blobBase = `https://github.com/${repo}/blob/${MEDIA_BRANCH}`;
   const toRepoPath = (file) => `${destPrefix}/${path.relative(outDir, file)}`;
   const icon = { passed: '✅', expected: '✅', failed: '❌', unexpected: '❌', flaky: '⚠️', skipped: '⏭️' };
 
   let md = `${MARKER}\n### 🎬 E2E evidence (screenshots & recordings)\n\n`;
-  if (isPrivate) {
-    md += `> リポジトリが private のため画像はインライン表示されません(GitHub の camo プロキシが認証不可)。各リンクをクリックすると表示されます。public にするとインライン表示に切り替わります。\n\n`;
-  }
   for (const test of tests) {
     const media = test.media ?? { screenshots: [], gifs: [] };
     md += `<details><summary>${icon[test.status] ?? '❔'} ${test.title} <em>(${(test.durationMs / 1000).toFixed(1)}s)</em></summary>\n\n`;
@@ -161,16 +160,10 @@ function buildComment(isPrivate) {
       md += `_no media captured_\n`;
     }
     for (const file of media.gifs) {
-      const repoPath = toRepoPath(file);
-      md += isPrivate
-        ? `📹 [recording (gif)](${blobBase}/${repoPath})\n\n`
-        : `![recording](${rawBase}/${repoPath})\n\n`;
+      md += `![recording](${blobBase}/${toRepoPath(file)}?raw=true)\n\n`;
     }
     for (const file of media.screenshots) {
-      const repoPath = toRepoPath(file);
-      md += isPrivate
-        ? `🖼️ [screenshot](${blobBase}/${repoPath})\n\n`
-        : `<img src="${rawBase}/${repoPath}" width="480" />\n\n`;
+      md += `![screenshot](${blobBase}/${toRepoPath(file)}?raw=true)\n\n`;
     }
     md += `</details>\n\n`;
   }
@@ -195,7 +188,7 @@ function upsertComment(body) {
 }
 
 if (DRY_RUN) {
-  console.log(buildComment(true));
+  console.log(buildComment());
   console.log(`\n--- dry run: media prepared under ${outDir}, nothing pushed/posted ---`);
 } else {
   if (!repo || !process.env.GH_TOKEN || prNumber === '0') {
@@ -206,8 +199,6 @@ if (DRY_RUN) {
     (t) => (t.media?.screenshots.length ?? 0) + (t.media?.gifs.length ?? 0) > 0,
   );
   if (hasMedia) publishMedia();
-  const isPrivate =
-    sh('gh', ['api', `repos/${repo}`, '--jq', '.private']).trim() === 'true';
-  upsertComment(buildComment(isPrivate));
+  upsertComment(buildComment());
   console.log(`comment upserted on PR #${prNumber} (${tests.length} tests).`);
 }
