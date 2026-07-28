@@ -7,21 +7,25 @@ LLM を用いた開発で「実装 → ユニットテスト → E2E(結合)」�
 
 ## セットアップ
 
+[devenv](https://devenv.sh/) が Node.js / pnpm / ffmpeg と pre-commit フック
+(oxfmt / oxlint)を提供します:
+
 ```bash
-npm ci
-npx playwright install chromium
+devenv shell            # 初回はフックの自動インストールも行われる
+pnpm install
+pnpm exec playwright install chromium
 ```
 
 ## コマンド
 
-| コマンド | 内容 |
-|---|---|
-| `npm run dev:api` / `npm run dev:web` | 開発サーバ(8787 / 5173) |
-| `npm run test:unit` | ユニットテスト(Vitest) |
-| `npm run e2e` | E2E 全実行(サーバ自動起動) |
-| `npm run e2e:smoke` | @smoke のみ |
-| `npm run e2e:perf` | trace 全記録(perf レーン) |
-| `npm run analyze:traces` | トレース解析レポート |
+| コマンド                        | 内容                       |
+| ------------------------------- | -------------------------- |
+| `pnpm dev:api` / `pnpm dev:web` | 開発サーバ(8787 / 5173)    |
+| `pnpm test:unit`                | ユニットテスト(Vitest)     |
+| `pnpm e2e`                      | E2E 全実行(サーバ自動起動) |
+| `pnpm e2e:smoke`                | @smoke のみ                |
+| `pnpm e2e:perf`                 | trace 全記録(perf レーン)  |
+| `pnpm analyze:traces`           | トレース解析レポート       |
 
 ## テストの層構成([docs/POLICY.md](docs/POLICY.md) の判定表参照)
 

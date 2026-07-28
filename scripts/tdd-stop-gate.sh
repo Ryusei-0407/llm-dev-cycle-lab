@@ -15,7 +15,7 @@ case "$input" in
   *'"stop_hook_active":true'*) exit 0 ;;
 esac
 
-if ! npm run test:unit --silent >/tmp/tdd-gate.log 2>&1; then
+if ! pnpm run test:unit >/tmp/tdd-gate.log 2>&1; then
   echo "TDD gate: unit tests are failing. Fix them before finishing (tail of output below)." >&2
   tail -n 20 /tmp/tdd-gate.log >&2
   exit 2

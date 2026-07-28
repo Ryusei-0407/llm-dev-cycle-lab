@@ -3,29 +3,46 @@ name: CI
 on:
   pull_request:
     paths:
-      - 'apps/**'
-      - 'e2e/**'
-      - 'scripts/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/**'
+      - "apps/**"
+      - "e2e/**"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/**"
 
 permissions:
   contents: write # pr-media-comment pushes screenshots/gifs to the ci-media branch
   pull-requests: write
 
 jobs:
+  # Format + lint (oxfmt/oxlint via vp) + typecheck. Fast fail lane.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm fmt:check
+      - run: pnpm lint
+      - run: pnpm -r typecheck
+
   # Runs node unit tests AND Vitest Browser Mode component tests,
   # so it needs chromium too (shared cache with the e2e job).
   unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Get Playwright version
         id: pw-version
         run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
@@ -37,11 +54,11 @@ jobs:
           key: pw-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright (chromium only)
         if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
       - name: Install Playwright OS deps only (cache hit)
         if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
-      - run: npm run test:unit
+        run: pnpm exec playwright install-deps chromium
+      - run: pnpm test:unit
 
   # PR lane: mock E2E only, chromium only, budget ~5 min.
   # @backend (full-stack) and cross-browser runs live in nightly.yml.
@@ -49,11 +66,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
 
       - name: Get Playwright version
         id: pw-version
@@ -66,13 +84,13 @@ jobs:
           key: pw-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright (chromium only)
         if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
       - name: Install Playwright OS deps only (cache hit)
         if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium
 
       - name: Run mock E2E
-        run: npx playwright test -c e2e/playwright.config.ts --grep-invert "@quarantine|@backend"
+        run: pnpm exec playwright test -c e2e/playwright.config.ts --grep-invert "@quarantine|@backend"
 
       - name: Upload report
         if: ${{ !cancelled() }}

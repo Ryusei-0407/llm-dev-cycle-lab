@@ -7,10 +7,8 @@ export function sseBody(
   opts: { done?: boolean; errorAfter?: boolean } = {},
 ): string {
   const { done = true, errorAfter = false } = opts;
-  let body = deltas
-    .map((delta) => `data: ${JSON.stringify({ delta })}\n\n`)
-    .join('');
-  if (errorAfter) body += `data: ${JSON.stringify({ error: 'stream_failed' })}\n\n`;
-  else if (done) body += 'data: [DONE]\n\n';
+  let body = deltas.map((delta) => `data: ${JSON.stringify({ delta })}\n\n`).join("");
+  if (errorAfter) body += `data: ${JSON.stringify({ error: "stream_failed" })}\n\n`;
+  else if (done) body += "data: [DONE]\n\n";
   return body;
 }

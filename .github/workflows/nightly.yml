@@ -2,7 +2,7 @@ name: Nightly
 
 on:
   schedule:
-    - cron: '0 18 * * *' # 03:00 JST
+    - cron: "0 18 * * *" # 03:00 JST
   workflow_dispatch:
 
 permissions:
@@ -16,14 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
       - name: Run full E2E (quarantine excluded from gate)
-        run: npx playwright test -c e2e/playwright.config.ts --grep-invert "@quarantine"
+        run: pnpm exec playwright test -c e2e/playwright.config.ts --grep-invert "@quarantine"
       - name: Upload report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -38,16 +39,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
       - name: Run E2E with full tracing
         env:
-          PW_TRACE: 'on'
-        run: npx playwright test -c e2e/playwright.config.ts --grep-invert "@quarantine"
+          PW_TRACE: "on"
+        run: pnpm exec playwright test -c e2e/playwright.config.ts --grep-invert "@quarantine"
       - name: Upload traces for local analysis
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
