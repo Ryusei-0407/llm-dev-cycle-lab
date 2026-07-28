@@ -114,6 +114,18 @@ LLM-as-judge の判定品質。パイプライン自体は @backend レーンで
   UI差分は `reg-viz/reg-actions`(外部ストレージ不要)
 - 注意: トレース/レポートには認証情報が含まれ得る。公開範囲に留意
 
+### 2.8 Vite 8 + Vite DevTools(検証済み)
+
+- Vite+ のコアはネイティブバイナリで、エンジンは Rolldown ベースの Vite 8 世代
+  (バナーは `VITE+ v0.2.6` とだけ表示され vite バージョンは出ない)。dev/build は
+  `vp` のまま、DevTools プラグインも `vp dev` 配下で動作する
+- `vite@8.1.5` は明示的な devDependency として保持: vitest / plugin-react の
+  peer 解決を単一の Vite 8 に揃えるため(明示しないと古い vite が自動解決される)
+- DevTools は `DEVTOOLS=1`(`dev:devtools` スクリプト)のときだけプラグインを注入。
+  E2E・CI のスクリーンショットにパネルが混入しないための環境変数ゲート
+- 接続時にターミナルへ6桁の認証コード(+マジックリンク)が出る。CI や headless では
+  この対話認証が制約になる点に注意
+
 ## 3. 参考資料(主要のみ)
 
 - Claude Code best practices / worktrees / hooks: https://code.claude.com/docs/en/best-practices

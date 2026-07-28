@@ -18,14 +18,15 @@ pnpm exec playwright install chromium
 
 ## コマンド
 
-| コマンド                        | 内容                       |
-| ------------------------------- | -------------------------- |
-| `pnpm dev:api` / `pnpm dev:web` | 開発サーバ(8787 / 5173)    |
-| `pnpm test:unit`                | ユニットテスト(Vitest)     |
-| `pnpm e2e`                      | E2E 全実行(サーバ自動起動) |
-| `pnpm e2e:smoke`                | @smoke のみ                |
-| `pnpm e2e:perf`                 | trace 全記録(perf レーン)  |
-| `pnpm analyze:traces`           | トレース解析レポート       |
+| コマンド                              | 内容                                                                                   |
+| ------------------------------------- | -------------------------------------------------------------------------------------- |
+| `pnpm dev:api` / `pnpm dev:web`       | 開発サーバ(8787 / 5173)                                                                |
+| `pnpm test:unit`                      | ユニットテスト(Vitest)                                                                 |
+| `pnpm e2e`                            | E2E 全実行(サーバ自動起動)                                                             |
+| `pnpm e2e:smoke`                      | @smoke のみ                                                                            |
+| `pnpm e2e:perf`                       | trace 全記録(perf レーン)                                                              |
+| `pnpm analyze:traces`                 | トレース解析レポート                                                                   |
+| `pnpm --filter @app/web dev:devtools` | Vite DevTools 付き dev サーバ(認証コードはターミナルに表示、`/__devtools/` で単体表示) |
 
 ## テストの層構成([docs/POLICY.md](docs/POLICY.md) の判定表参照)
 
