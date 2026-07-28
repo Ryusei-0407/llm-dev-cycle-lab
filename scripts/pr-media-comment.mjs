@@ -182,7 +182,12 @@ function buildComment() {
   const ordered = [...tests].sort((a, b) => Number(isFailure(b)) - Number(isFailure(a)));
   for (const test of ordered) {
     const media = test.media ?? { screenshots: [], gifs: [] };
-    md += `<details${isFailure(test) ? ' open' : ''}><summary>${icon[test.status] ?? '❔'} <b>${test.title}</b> <em>(${(test.durationMs / 1000).toFixed(1)}s)</em></summary>\n\n`;
+    // Bare @tags in the title would be auto-linked as GitHub user mentions;
+    // strip them from the title and show them as code spans instead.
+    const tags = [...new Set(test.title.match(/@[\w-]+/g) ?? [])];
+    const cleanTitle = test.title.replace(/\s*@[\w-]+/g, '').trim();
+    const tagBadges = tags.map((t) => `<code>${t}</code>`).join(' ');
+    md += `<details${isFailure(test) ? ' open' : ''}><summary>${icon[test.status] ?? '❔'} <b>${cleanTitle}</b> ${tagBadges} <em>(${(test.durationMs / 1000).toFixed(1)}s)</em></summary>\n\n`;
     if (media.screenshots.length === 0 && media.gifs.length === 0) {
       md += `_このテストのメディアはありません_\n`;
     }
