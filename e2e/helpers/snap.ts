@@ -1,13 +1,10 @@
 import type { Page, TestInfo } from '@playwright/test';
 
-/**
- * 段階スクリーンショット: 初期状態で1回 + UIの状態遷移ごとに1回呼ぶ
- * (n回変化する画面なら n+1 枚)。PRメディアコメントがラベル付き・時系列順に
- * 描画するため、レビュアーは最終フレームだけでなく遷移の過程を追える。
- *
- * 制約: attachment 名の `stage: ` プレフィックスは scripts/pr-media-comment.mjs
- * がキーにしているので変更できない。
- */
+// Stage screenshot: call once on the initial state and once after every UI
+// state change (n changes -> n+1 snaps). The PR media comment renders these
+// in order with their labels, so reviewers see the progression, not just the
+// final frame. Attachment names must keep the `stage: ` prefix — the media
+// script keys on it.
 export async function snap(page: Page, testInfo: TestInfo, label: string) {
   const index =
     testInfo.attachments.filter((a) => a.name.startsWith('stage: ')).length + 1;

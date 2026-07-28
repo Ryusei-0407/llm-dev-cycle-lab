@@ -1,15 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { snap } from '../helpers/snap';
 
-/**
- * チャットのE2E(実バックエンド結合)— nightly レーン
- *
- * - 検証対象: フロント → 実API → プロバイダのフルスタック疎通
- * - アサーション方針: 構造のみ(「空でない応答がエラーなしで届いた」)。
- *   これは実LLMスモークと同じ形であり、LLM_PROVIDER を実プロバイダに
- *   切り替えてもこのファイルは無変更で使える
- * - 応答テキストの中身は検証しない(内容は揺れる前提の設計)
- */
+// Full-stack tests against the real API (mock provider). Assertions are
+// structural only — "a non-empty reply arrived without errors" — which is the
+// exact shape a real-LLM smoke lane uses. Switching LLM_PROVIDER to a real
+// provider later requires no changes here.
 test.describe('chat against the real backend @backend @feature-chat', () => {
   test('full-stack roundtrip renders a non-empty streamed reply', async ({
     page,
@@ -35,7 +30,8 @@ test.describe('chat against the real backend @backend @feature-chat', () => {
       await snap(page, testInfo, '応答表示');
     });
 
-    // 構造アサーション: 応答が非決定的でも成立する検証のみ(role と順序)
+    // Content-independent structure: exactly what a real-LLM smoke run
+    // can still assert when the reply text is nondeterministic.
     await expect(page.locator('main')).toMatchAriaSnapshot(`
       - list:
         - listitem: /user/

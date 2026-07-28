@@ -1,10 +1,7 @@
-/**
- * page.route モック用に /api/chat のワイヤフォーマットどおりのSSEボディを組み立てる。
- *
- * 制約: route.fulfill() はボディを一括送信するため、「逐次描画」は再現できない。
- * 逐次描画の検証は Vitest Browser Mode(apps/web/test-browser/)と
- * @backend テストが担当する。
- */
+// Builds an SSE body matching the /api/chat wire format, for page.route mocks.
+// Note: route.fulfill() sends the whole body at once — fine for asserting final
+// state, but it cannot reproduce incremental rendering. Incremental streaming
+// behaviour is covered by Vitest Browser Mode and the @backend tests.
 export function sseBody(
   deltas: string[],
   opts: { done?: boolean; errorAfter?: boolean } = {},
