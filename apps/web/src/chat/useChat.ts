@@ -1,9 +1,12 @@
-import { useCallback, useReducer, useRef } from 'react';
+import { useCallback, useReducer, useRef, useState } from 'react';
 import { createSSEParser } from './parseSSE';
 import { chatReducer, initialState } from './reducer';
 
+export const SLOW_HINT_MS = 10_000;
+
 export function useChat() {
   const [state, dispatch] = useReducer(chatReducer, initialState);
+  const [slowHint, setSlowHint] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
   const abortRef = useRef<AbortController | null>(null);
@@ -14,6 +17,7 @@ export function useChat() {
     dispatch({ type: 'start', content });
     const controller = new AbortController();
     abortRef.current = controller;
+    const slowTimer = setTimeout(() => setSlowHint(true), SLOW_HINT_MS);
 
     try {
       const res = await fetch('/api/chat', {
@@ -52,6 +56,9 @@ export function useChat() {
     } catch {
       if (controller.signal.aborted) dispatch({ type: 'stop' });
       else dispatch({ type: 'error', message: 'network error' });
+    } finally {
+      clearTimeout(slowTimer);
+      setSlowHint(false);
     }
   }, []);
 
@@ -59,5 +66,5 @@ export function useChat() {
     abortRef.current?.abort();
   }, []);
 
-  return { state, send, stop };
+  return { state, slowHint, send, stop };
 }

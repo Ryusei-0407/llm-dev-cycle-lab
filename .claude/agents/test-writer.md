@@ -19,6 +19,10 @@ isolation: worktree
 3. E2E は 1 機能につき 正常系1本 + 失敗系2本まで。失敗系は「UIに専用ハンドリングがある失敗」(エラーバナー、リトライ等)のみ。LLM出力の品質検証は書かない
 4. E2E は `page.route()` によるモックを基本とし、`data-testid` / ロールでセレクトする。`waitForTimeout` 禁止
 5. タグ規約: 機能タグ `@feature-<name>` を必ず付け、主経路には `@smoke` を追加
+6. テスト層は docs/POLICY.md の判定表に従って選ぶ(component のデフォルトは
+   Vitest Browser Mode、`page.clock`/`page.route`/video が必要なときのみ Playwright CT)
+7. E2E はフェーズを `test.step` で構造化し、状態遷移ごとに `snap()`(e2e/helpers/snap.ts)で
+   ラベル付きスクショを撮る。最終状態に `toMatchAriaSnapshot` を1枚置く(role と順序のみ)
 
 ## 完了報告
 

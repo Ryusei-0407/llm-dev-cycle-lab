@@ -41,7 +41,21 @@ export default defineConfig({
       : 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // Playwright component tests (stories & galleries): reserved for cases
+    // Vitest Browser Mode cannot cover — page.clock, page.route, video/trace
+    // evidence at component level. See docs/POLICY.md for the layer rules.
+    {
+      name: 'components',
+      testDir: path.join(configDir, 'components'),
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:5173/playwright/gallery/index.html',
+        serviceWorkers: 'block',
+      },
+    },
+  ],
   webServer: [
     {
       command: 'npm run dev -w @app/api',

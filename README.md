@@ -23,11 +23,14 @@ npx playwright install chromium
 | `npm run e2e:perf` | trace 全記録(perf レーン) |
 | `npm run analyze:traces` | トレース解析レポート |
 
-## テストの3層構成
+## テストの層構成([docs/POLICY.md](docs/POLICY.md) の判定表参照)
 
-1. **モック E2E**(`@feature-*`) — `page.route()` で API を決定的に固定。全 PR で実行
-2. **バックエンド結合**(`@backend`) — 実 API + 決定的モックプロバイダ。構造的アサーションのみ。nightly。実 LLM に切り替えても(環境変数のみで)テストコードは不変
-3. **Evals**(未導入) — LLM 出力の品質評価。promptfoo 等を別ジョブで
+1. **ユニット**(Vitest/node) — 純ロジック
+2. **コンポーネント / Vitest Browser Mode**(`apps/web/test-browser/`) — 実ブラウザでしか検証できない挙動(ストリーミング逐次描画等)。componentテストのデフォルト
+3. **コンポーネント / Playwright CT**(`src/*.story.tsx` + `e2e/components/`) — BMで不可能なもののみ(`page.clock` 等)
+4. **モック E2E**(`@feature-*`) — `page.route()` で API を決定的に固定。全 PR で実行
+5. **バックエンド結合**(`@backend`) — 実 API + 決定的モックプロバイダ。構造的アサーションのみ。nightly。実 LLM に切り替えても(環境変数のみで)テストコードは不変
+6. **Evals**(未導入) — LLM 出力の品質評価。promptfoo 等を別ジョブで
 
 ## Claude Code ワークフロー
 

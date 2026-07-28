@@ -8,5 +8,6 @@ e2e/results.json
 .media-branch/
 .media-comment.md
 e2e/media-out/
+apps/web/test-browser/__screenshots__/
 *.log
 .DS_Store

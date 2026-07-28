@@ -1,3 +1,4 @@
+import { playwright } from '@vitest/browser-playwright';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite-plus';
 
@@ -11,6 +12,32 @@ export default defineConfig({
     },
   },
   test: {
-    environment: 'node',
+    projects: [
+      // Pure logic (parser, reducer) — fast, no browser.
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'node',
+          include: ['test/**/*.test.ts'],
+        },
+      },
+      // Component layer: real-browser behaviour JSDOM cannot reproduce
+      // (incremental streaming render, scrolling, focus). Runs in the same
+      // vp test invocation via the bundled Vitest browser mode.
+      {
+        extends: true,
+        test: {
+          name: 'browser',
+          include: ['test-browser/**/*.test.tsx'],
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [{ browser: 'chromium' }],
+          },
+        },
+      },
+    ],
   },
 });

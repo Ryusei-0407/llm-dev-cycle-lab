@@ -1,7 +1,10 @@
 # llm-dev-cycle-lab
 
 LLM駆動開発の「実装 → ユニットテスト → E2E」サイクルを検証するサンプル。
-チャットアプリ(フロント/バックエンド分離)+ 3層テスト構成 + トレース駆動最適化。
+チャットアプリ(フロント/バックエンド分離)+ 多層テスト構成 + トレース駆動最適化。
+
+**開発方針(必読)**: [docs/POLICY.md](docs/POLICY.md) — エージェントファースト6原則と
+テスト層の判定表。テストをどの層に書くかはこの表に従うこと。
 
 ## 構成
 
@@ -35,5 +38,11 @@ LLM駆動開発の「実装 → ユニットテスト → E2E」サイクルを�
 
 - 固定待ち(`waitForTimeout`)禁止。web-first assertion を使う
 - セレクタは `data-testid` / ロール優先
+- E2E はフェーズを `test.step` で構造化し、状態遷移ごとに `snap()`(helpers/snap.ts)で
+  ラベル付きスクショを撮る(trace・PRコメントが物語として読めるようにする)
+- 最終状態には `toMatchAriaSnapshot` の構造アサーションを1枚置く(内容でなく role と順序)
+- コンポーネントテストのデフォルトは Vitest Browser Mode(`apps/web/test-browser/`)。
+  `page.clock` / `page.route` / video が必要な場合のみ Playwright CT
+  (`src/*.story.tsx` + `e2e/components/`)
 - flaky になったテストは `@quarantine` タグを付けて PR レーンから外し、修正 issue を立てる
 - 接続情報をテストコードに書かない(実行基盤の差し替えは設定・環境変数で行う)
