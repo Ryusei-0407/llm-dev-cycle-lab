@@ -29,11 +29,13 @@ export default defineConfig({
     // PW_TRACE=on is the nightly perf lane: record everything so the
     // trace-analyst can mine timings. Default stays cheap for the PR lane.
     trace: process.env.PW_TRACE === 'on' ? 'on' : 'on-first-retry',
-    // CI records everything: the suite is small and the PR media comment
-    // (scripts/pr-media-comment.mjs) attaches evidence for passing runs too.
-    // Revisit if the suite grows enough to hurt the PR-lane time budget.
+    // CI records video for every test: the suite is small and the PR media
+    // comment (scripts/pr-media-comment.mjs) attaches evidence for passing
+    // runs too. Revisit if the suite grows enough to hurt the time budget.
+    // Screenshots are staged explicitly via helpers/snap.ts (initial state +
+    // one per UI state change); the automatic one only fires on failure.
     video: process.env.CI ? 'on' : 'retain-on-failure',
-    screenshot: process.env.CI ? 'on' : 'only-on-failure',
+    screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [

@@ -85,14 +85,23 @@ try {
 for (const test of tests) {
   const dir = path.join(outDir, slug(test.title));
   test.media = { screenshots: [], gifs: [] };
-  const screenshots = test.attachments.filter((a) => a.name === 'screenshot');
+  // Staged snaps (helpers/snap.ts) in order, plus the automatic
+  // failure screenshot when present.
+  const screenshots = test.attachments.filter(
+    (a) => a.name === 'screenshot' || a.name.startsWith('stage: '),
+  );
   const videos = test.attachments.filter((a) => a.name === 'video');
   if (screenshots.length === 0 && videos.length === 0) continue;
   mkdirSync(dir, { recursive: true });
   screenshots.forEach((a, i) => {
     const file = path.join(dir, `screenshot-${i + 1}${path.extname(a.path) || '.png'}`);
     cpSync(a.path, file);
-    test.media.screenshots.push(file);
+    test.media.screenshots.push({
+      file,
+      label: a.name.startsWith('stage: ')
+        ? a.name.slice('stage: '.length)
+        : 'on failure',
+    });
   });
   if (ffmpeg) {
     videos.forEach((a, i) => {
@@ -100,7 +109,7 @@ for (const test of tests) {
       try {
         sh(ffmpeg, [
           '-y', '-i', a.path,
-          '-vf', 'fps=8,scale=480:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse',
+          '-vf', 'fps=8,scale=800:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse',
           file,
         ]);
         test.media.gifs.push(file);
@@ -165,8 +174,8 @@ function buildComment() {
     for (const file of media.gifs) {
       md += `![recording](${blobBase}/${toRepoPath(file)}?raw=true)\n\n`;
     }
-    for (const file of media.screenshots) {
-      md += `![screenshot](${blobBase}/${toRepoPath(file)}?raw=true)\n\n`;
+    for (const { file, label } of media.screenshots) {
+      md += `**${label}**\n\n![${label}](${blobBase}/${toRepoPath(file)}?raw=true)\n\n`;
     }
     md += `</details>\n\n`;
   }
