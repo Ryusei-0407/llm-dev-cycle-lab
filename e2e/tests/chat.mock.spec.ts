@@ -88,9 +88,6 @@ test.describe('chat with mocked API @feature-chat', () => {
     `);
   });
 
-  // Pinned by adversarial review: the Stop button could be deleted outright
-  // without any test noticing. Asserts both spec conditions: visible only
-  // while streaming, and clicking it actually cancels the request.
   test('stop cancels a streaming response', async ({ page }, testInfo) => {
     await page.route('**/api/chat', async (route) => {
       // Long delay keeps the request in-flight so Stop is observable; the
