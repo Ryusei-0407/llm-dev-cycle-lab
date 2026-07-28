@@ -109,7 +109,7 @@ for (const test of tests) {
       try {
         sh(ffmpeg, [
           '-y', '-i', a.path,
-          '-vf', 'fps=8,scale=800:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse',
+          '-vf', 'fps=10,scale=1280:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse',
           file,
         ]);
         test.media.gifs.push(file);

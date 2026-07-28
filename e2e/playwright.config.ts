@@ -34,7 +34,11 @@ export default defineConfig({
     // runs too. Revisit if the suite grows enough to hurt the time budget.
     // Screenshots are staged explicitly via helpers/snap.ts (initial state +
     // one per UI state change); the automatic one only fires on failure.
-    video: process.env.CI ? 'on' : 'retain-on-failure',
+    // Explicit size: Playwright otherwise scales recordings down to fit
+    // 800x800, which caps the gif resolution at 800px wide.
+    video: process.env.CI
+      ? { mode: 'on', size: { width: 1280, height: 720 } }
+      : 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
