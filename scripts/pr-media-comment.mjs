@@ -71,11 +71,14 @@ for (const suite of report.suites ?? []) walkSuite(suite, [suite.title]);
 const outDir = 'e2e/media-out';
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
-let ffmpegOk = true;
+
+// Needs a real ffmpeg on PATH (CI installs it via apt). Playwright's bundled
+// ffmpeg is no substitute: it is a minimal build without a GIF encoder.
+let ffmpeg = 'ffmpeg';
 try {
-  sh('ffmpeg', ['-version']);
+  sh(ffmpeg, ['-version']);
 } catch {
-  ffmpegOk = false;
+  ffmpeg = null;
   console.error('ffmpeg not found — recordings will be skipped.');
 }
 
@@ -91,11 +94,11 @@ for (const test of tests) {
     cpSync(a.path, file);
     test.media.screenshots.push(file);
   });
-  if (ffmpegOk) {
+  if (ffmpeg) {
     videos.forEach((a, i) => {
       const file = path.join(dir, `recording-${i + 1}.gif`);
       try {
-        sh('ffmpeg', [
+        sh(ffmpeg, [
           '-y', '-i', a.path,
           '-vf', 'fps=8,scale=480:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse',
           file,
