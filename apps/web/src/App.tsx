@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useChat } from './chat/useChat';
 
 export function App() {
-  const { state, send, stop } = useChat();
+  const { state, slowHint, send, stop } = useChat();
   const [draft, setDraft] = useState('');
   const streaming = state.status === 'streaming';
 
@@ -33,6 +33,9 @@ export function App() {
           ))}
       </ul>
       {streaming && <div data-testid="typing-indicator">Assistant is typing…</div>}
+      {streaming && slowHint && (
+        <div data-testid="slow-hint">応答に時間がかかっています…</div>
+      )}
       <form onSubmit={onSubmit}>
         <input
           aria-label="Message"

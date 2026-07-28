@@ -1,39 +1,32 @@
 # llm-dev-cycle-lab
 
-LLM駆動開発の「実装 → ユニットテスト → E2E」サイクルを検証するサンプル。
-チャットアプリ(フロント/バックエンド分離)+ 3層テスト構成 + トレース駆動最適化。
+LLM駆動開発の「実装 → テスト → E2E」サイクルを検証するラボ。題材は SSE ストリーミングの
+チャットアプリ(`apps/api` = Hono、`apps/web` = Vite+/React、`e2e` = Playwright)。
 
-## 構成
-
-- `apps/api` — Hono バックエンド。`POST /api/chat` が SSE ストリーミング。LLM は `LLMProvider` インターフェース背後の決定的モック(`MockProvider`)
-- `apps/web` — Vite + React チャット UI。`useChat` が SSE を逐次パースして描画
-- `e2e` — Playwright。`@feature-*` / `@smoke` / `@backend` / `@quarantine` タグで層別
-- `scripts/analyze-trace.mjs` — trace.zip を解析して遅いアクション・ネットワーク・console エラーを Markdown 出力
+- 開発方針・テスト層の判定表・テスト規約: `docs/POLICY.md`(テストをどの層に書くか迷ったら読む)
+- 機能追加・変更のタスクは `/dev-cycle` スキルの手順に従う
 
 ## コマンド
 
-- `npm run test:unit` — 全ワークスペースのユニットテスト(Vitest)
-- `npm run e2e` — E2E 全実行(api/web の dev サーバは Playwright が自動起動)
-- `npm run e2e:smoke` — @smoke のみ
-- `npm run e2e:perf` — trace: 'on' で全記録(perf レーン)
-- `npm run analyze:traces` — trace.zip 群の解析レポート
+- `npm run test:unit` — ユニット + Vitest Browser Mode(実chromium)の両方が走る
+- `npm run e2e` / `npm run e2e -- --grep @feature-<name>` / `npm run e2e -- --last-failed`
+- `npm run e2e:perf` → `npm run analyze:traces` — trace 全記録と機械解析
+- dev サーバは Playwright が自動起動(手動なら `npm run dev:api` + `npm run dev:web`)
 
-## 開発サイクル(必読)
+## 作業スタイル
 
-機能開発は `/dev-cycle` スキルの手順に従うこと。要点:
+- 要求されたことを要求された範囲で完了させれば十分。追加でやると良さそうなことを
+  見つけたら、完了報告に提案として添えて次の指示を待つ
+- コメントは普遍的な内容(外部制約、非自明な理由、数値の根拠)だけを書く。
+  修正の経緯・出所はコミットメッセージへ。コメントが長文になりそうなときは、
+  先に処理ロジック側の改善余地を疑う
 
-1. 仕様と E2E 観点を `specs/<feature>.md` に書いてから着手
-2. テスト作成(test-writer)と実装(implementer)は別エージェント・別 worktree で並列
-3. 実装エージェントはテストファイル(`**/*.test.ts`, `e2e/tests/**`)を変更してはならない
-4. 機能の完了条件は「ユニット + その機能のモック E2E がグリーン」。E2E を後回しにしない
-   グリーン後、adversarial-reviewer による反証フェーズ(Phase 2.5)を通す。
-   反証が成立したら、反例をテストとして固定してから修正する
-5. E2E テストケースは 1 機能につき 正常系1本 + 失敗系2本まで。失敗系は「UI に専用ハンドリングがある失敗」のみ
-6. LLM 出力の「品質」を E2E で検証しない(evals レーンの仕事)。E2E は配管のみ
+## このリポジトリ特有の注意(踏んだ罠)
 
-## テストの規約
-
-- 固定待ち(`waitForTimeout`)禁止。web-first assertion を使う
-- セレクタは `data-testid` / ロール優先
-- flaky になったテストは `@quarantine` タグを付けて PR レーンから外し、修正 issue を立てる
-- 接続情報をテストコードに書かない(実行基盤の差し替えは設定・環境変数で行う)
+- Playwright の `outputDir` / reporter のパスは**設定ファイル基準で明示**する。相対パスは
+  cwd 基準で解決され、成果物が想定外の場所に出る(`e2e/playwright.config.ts` 参照)
+- Playwright 同梱の ffmpeg は GIF エンコーダを持たない。PRメディア用の GIF 変換には
+  実 ffmpeg が必要(CI は apt でインストール)
+- TDDゲート(Stop hook)は `.claude/tdd-gate` ファイルの有無で on/off(`touch` / `rm`)
+- PRコメントの画像は `ci-media` ブランチ + 同一リポジトリ blob URL(`?raw=true`)方式。
+  private リポジトリでもインライン表示される(camo で壊れるのは外部ドメイン画像のみ)

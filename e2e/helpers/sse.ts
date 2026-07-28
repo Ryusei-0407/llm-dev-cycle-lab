@@ -1,7 +1,7 @@
 // Builds an SSE body matching the /api/chat wire format, for page.route mocks.
 // Note: route.fulfill() sends the whole body at once — fine for asserting final
 // state, but it cannot reproduce incremental rendering. Incremental streaming
-// behaviour is covered by the @backend tests against the real mock-provider API.
+// behaviour is covered by Vitest Browser Mode and the @backend tests.
 export function sseBody(
   deltas: string[],
   opts: { done?: boolean; errorAfter?: boolean } = {},

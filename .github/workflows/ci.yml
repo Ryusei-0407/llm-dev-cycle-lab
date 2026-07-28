@@ -5,6 +5,7 @@ on:
     paths:
       - 'apps/**'
       - 'e2e/**'
+      - 'scripts/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/**'
@@ -14,6 +15,8 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Runs node unit tests AND Vitest Browser Mode component tests,
+  # so it needs chromium too (shared cache with the e2e job).
   unit:
     runs-on: ubuntu-latest
     steps:
@@ -23,6 +26,21 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+      - name: Install Playwright (chromium only)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Install Playwright OS deps only (cache hit)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
       - run: npm run test:unit
 
   # PR lane: mock E2E only, chromium only, budget ~5 min.
