@@ -45,5 +45,5 @@ adversarial-reviewer を新規コンテキストで起動する。渡すのは�
 
 ## Phase 3: PR
 
-`pnpm e2e:smoke` で回帰がないことを確認して PR を作成。
+`pnpm check`(規約検証込み)→ `pnpm e2e:smoke` の順で通してから PR を作成。
 CI がモックE2Eを実行し、サマリとメディア(録画・段階スクショ)をPRコメントに投稿する。

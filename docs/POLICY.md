@@ -33,6 +33,15 @@ grep可能な出力)で得られること。
 
 LLMへの「お願い」は忘れられる。守らせたいものは構造(hook、権限、ディレクトリ分離)にする。
 
+検証ループは4形態で配置する(どこで何を検証するかの対応):
+
+| 形態                  | 実装                                                                     | 対象                           |
+| --------------------- | ------------------------------------------------------------------------ | ------------------------------ |
+| embedded(生成と同時)  | test-writer の RED 確認 + verify-conventions、implementer のグリーン確認 | 作った直後の自己検証           |
+| chained(完了時に連鎖) | dev-cycle: グリーン → 反証(adversarial-reviewer) → smoke → PR            | フェーズ間の検証済みハンドオフ |
+| standalone(随時)      | /verify-conventions、/analyze-traces                                     | 横断的な監査                   |
+| PR gate(全PR強制)     | CI: check(fmt/lint/型/規約)+ unit + e2e、TDD stop hook                   | 作者の注意深さに依存しない下限 |
+
 ### 4. テストは層で分け、各層の責務を越えない
 
 | 層                                                 | 実行                            | 対象                                                                                                                         | 判定基準                                                                                 |
@@ -55,8 +64,13 @@ LLMへの「お願い」は忘れられる。守らせたいものは構造(hook
 - E2E 本数は機能につき正常1+失敗2まで。失敗系は「UIに専用ハンドリングがある失敗」のみ。
   反証フェーズで固定されたテストは上限に数えない
 - タグ: `@feature-<name>`(必須)/ `@smoke`(主経路)/ `@backend`(nightly)/
-  `@component`(CT)/ `@quarantine`(flaky隔離、nightlyのみ・ゲート外)
+  `@component`(CT)/ `@quarantine`(flaky隔離、nightlyのみ・ゲート外)/
+  `@pinned`(反証フェーズで固定されたテスト。E2E本数上限の免除根拠)
 - 接続情報・環境依存の値をテストコードに書かない(設定・環境変数で差し替え可能に保つ)
+
+この規約のうち決定論的に判定できるものは `scripts/verify-conventions.mjs` が
+機械的に強制する(`pnpm check`・pre-commit・CI に組み込み済み)。規約を増やすときは
+ルールも同時に足す(規約とルールの乖離を作らない)。
 
 ### 5. 人間向け可視化は証跡から自動生成する
 
