@@ -16,7 +16,32 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Format + lint (oxfmt/oxlint via vp) + typecheck. Fast fail lane.
+  # Decides which lanes the diff actually needs, so tooling-only changes
+  # (scripts, workflows housekeeping) skip the slow jobs. check always runs.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      e2e: ${{ steps.filter.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            app: &app
+              - "apps/**"
+              - "package.json"
+              - "pnpm-lock.yaml"
+              - "pnpm-workspace.yaml"
+            e2e:
+              - *app
+              - "e2e/**"
+              - "scripts/pr-media-comment.mjs"
+              - ".github/workflows/ci.yml"
+
+  # Format + lint (oxfmt/oxlint via vp) + typecheck + conventions.
+  # Fast fail lane — runs on every PR regardless of what changed.
   check:
     runs-on: ubuntu-latest
     steps:
@@ -32,6 +57,8 @@ jobs:
   # Runs node unit tests AND Vitest Browser Mode component tests,
   # so it needs chromium too (shared cache with the e2e job).
   unit:
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,6 +88,8 @@ jobs:
   # PR lane: mock E2E only, chromium only, budget ~5 min.
   # @backend (full-stack) and cross-browser runs live in nightly.yml.
   e2e:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
