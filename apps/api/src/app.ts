@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
+import { createAuthRouter } from "./auth/routes.js";
 import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
 
@@ -13,6 +14,11 @@ export function createApp() {
   const app = new Hono();
 
   app.get("/api/health", (c) => c.json({ ok: true }));
+
+  // Session store lives for the life of this app instance (in-memory), so all
+  // /api/auth/* requests against one createApp() share it.
+  const { router: authRouter } = createAuthRouter();
+  app.route("/api/auth", authRouter);
 
   app.post("/api/chat", async (c) => {
     let body: unknown;
