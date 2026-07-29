@@ -5,12 +5,13 @@ tickets ストアを PostgreSQL に移行し、テストは**コンテナの一�
 
 ## DB とスキーマ
 
-- PostgreSQL 16(`postgres:16-alpine` コンテナ)
+- PostgreSQL 18(`postgres:18-alpine` コンテナ)— **18 必須**: チケット id に
+  ネイティブの `uuidv7()`(時系列順序を持つ UUID v7)を使うため
 - スキーマ(`apps/api/db/schema.sql`):
 
 ```sql
 CREATE TABLE tickets (
-  id uuid PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT uuidv7(),
   subject text NOT NULL CHECK (char_length(subject) BETWEEN 1 AND 200),
   status text NOT NULL CHECK (status IN ('open', 'in_progress', 'resolved')),
   priority text NOT NULL CHECK (priority IN ('low', 'medium', 'high')),
@@ -19,14 +20,15 @@ CREATE TABLE tickets (
 );
 ```
 
-- シード(`apps/api/db/seed.sql`): 既存の決定的3件。**id は固定 UUID**(例: 00000000-0000-4000-8000-000000000001〜03)、
+- シード(`apps/api/db/seed.sql`): 既存の決定的3件。**id は固定 UUID(v7形式のリテラル、
+  例: 00000000-0000-7000-8000-000000000001〜03)**、
   created_at も固定値で並び順が決定的になるようにする(subject/status/priority/requester は specs/tickets.md と同一)
 
 ## 一時DBの供給(scripts/test-db.mjs)
 
 2モード。判定は `DATABASE_URL` の有無:
 
-- **ローカル(provision モード)**: `DATABASE_URL` 未設定なら `docker run -d --rm` で postgres:16-alpine を
+- **ローカル(provision モード)**: `DATABASE_URL` 未設定なら `docker run -d --rm` で postgres:18-alpine を
   空きポート・ユニーク名(例: llmlab-pg-$RANDOM)で起動 → 起動待ち → schema+seed 投入 → 接続URLを返す。
   `--teardown` でコンテナ停止。**並列 worktree で衝突しないこと**(固定ポート・固定名を使わない)
 - **CI/BYO(reset モード)**: `DATABASE_URL` があればそのDBに対して DROP/CREATE スキーマ + seed のみ実行
@@ -40,7 +42,7 @@ CREATE TABLE tickets (
 ```ts
 createTicketStore(pool: Pool): {
   list(): Promise<Ticket[]>;            // created_at DESC, id DESC で決定的
-  create(input: { subject; priority; requesterEmail }): Promise<Ticket>;
+  create(input: { subject; priority; requesterEmail }): Promise<Ticket>; // id は DB の uuidv7() デフォルトに任せ RETURNING で取得(アプリ側で生成しない)
   setStatus(id: string, status: TicketStatus): Promise<Ticket>; // 不在は NotFoundError を throw
 }
 ```
@@ -59,8 +61,9 @@ createTicketStore(pool: Pool): {
 - **E2E**: playwright globalSetup で一時DB を provision(または DATABASE_URL 利用)し、
   webServer(api)の env に DATABASE_URL を渡す。**既存の tickets E2E 3本はテストコード無変更で
   緑になること**(ストア差し替えの後方互換の証明)
-- **CI**: unit / e2e ジョブに postgres service container を追加し DATABASE_URL を設定
-  (llm-smoke / nightly full も同様)
+- **CI(必須要件)**: unit / e2e ジョブに `postgres:18-alpine` の service container を追加し
+  DATABASE_URL を設定(llm-smoke / nightly full / perf も同様)。**DB を使うテストが CI で
+  実際に実行されること**が受け入れ条件(スキップや除外での回避は不可)
 
 ## E2E観点
 
@@ -69,5 +72,6 @@ createTicketStore(pool: Pool): {
 ## unit/統合観点
 
 - store: list の決定的順序 / create のバリデーションと永続化(再接続後も残る=同一Pool内で再取得)/
+  **create の id が UUID v7 であること(version ニブルが '7')** /
   setStatus / NOT_FOUND / seed リセットの分離(連続テストで件数が汚染されない)
 - test-db: DATABASE_URL 有無での2モード分岐(docker 起動はモックせず実 docker で1ケース検証してよい)
