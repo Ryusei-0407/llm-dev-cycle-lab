@@ -6,7 +6,7 @@ import { createAuthRouter } from "./auth/routes.js";
 import { GeminiProvider } from "./llm/gemini.js";
 import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
-import { appRouter } from "./tickets/router.js";
+import { appRouter, isDbConfigured } from "./tickets/router.js";
 
 // Thrown when LLM_PROVIDER selects a real provider whose required config is
 // missing. Surfaced as 500 provider_misconfigured — never a silent mock
@@ -32,6 +32,17 @@ export function createApp() {
   // /api/auth/* requests against one createApp() share it.
   const { router: authRouter } = createAuthRouter();
   app.route("/api/auth", authRouter);
+
+  // DB config guard: tickets is now postgres-backed, so a missing DATABASE_URL
+  // is a 500 db_misconfigured (same shape as the LLM provider_misconfigured
+  // guard) rather than a silent failure. Runs before the tRPC handler so no
+  // procedure attempts to connect to nowhere.
+  app.use("/api/trpc/*", async (c, next) => {
+    if (!isDbConfigured()) {
+      return c.json({ error: "db_misconfigured" }, 500);
+    }
+    await next();
+  });
 
   app.use("/api/trpc/*", trpcServer({ endpoint: "/api/trpc", router: appRouter }));
 
