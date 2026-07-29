@@ -88,6 +88,11 @@ export default defineConfig({
         ...(process.env as Record<string, string>),
         API_PORT: String(apiPort),
         MOCK_DELAY_MS: "20",
+        // Force the provider for the test lane: real Gemini only under the
+        // explicit LLM_SMOKE=1 nightly opt-in, mock otherwise. This overrides
+        // any LLM_PROVIDER=gemini that leaked in from a local .env, so ordinary
+        // E2E always runs against the deterministic mock.
+        LLM_PROVIDER: process.env.LLM_SMOKE === "1" ? "gemini" : "mock",
       },
     },
     {

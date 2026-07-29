@@ -33,6 +33,35 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 14
 
+  # Real-LLM smoke lane: run only the @backend tests against real Gemini.
+  # LLM_SMOKE=1 flips the api webServer to LLM_PROVIDER=gemini (playwright
+  # config); the key comes from Secrets. No retries — a real flaky call should
+  # be visible, not masked. Test code is unchanged: the @backend structural
+  # assertions are provider-agnostic by design.
+  llm-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run real-LLM smoke (@backend only)
+        env:
+          LLM_SMOKE: "1"
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: pnpm exec playwright test -c e2e/playwright.config.ts --grep "@backend" --retries=0
+      - name: Upload report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-smoke-report
+          path: e2e/playwright-report/
+          retention-days: 14
+
   # Perf lane: record traces for every test; the trace-analyst skill consumes
   # the artifact locally (gh run download --name perf-traces).
   perf:
