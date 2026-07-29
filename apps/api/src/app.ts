@@ -30,7 +30,7 @@ export function createApp() {
 
   // Session store lives for the life of this app instance (in-memory), so all
   // /api/auth/* requests against one createApp() share it.
-  const { router: authRouter } = createAuthRouter();
+  const { router: authRouter, resolveUser } = createAuthRouter();
   app.route("/api/auth", authRouter);
 
   // DB config guard: tickets is now postgres-backed, so a missing DATABASE_URL
@@ -46,7 +46,10 @@ export function createApp() {
 
   const rpcHandler = new RPCHandler(appRouter);
   app.use("/api/rpc/*", async (c, next) => {
-    const { matched, response } = await rpcHandler.handle(c.req.raw, { prefix: "/api/rpc" });
+    const { matched, response } = await rpcHandler.handle(c.req.raw, {
+      prefix: "/api/rpc",
+      context: { user: resolveUser(c) },
+    });
     if (matched) return c.newResponse(response.body, response);
     await next();
   });

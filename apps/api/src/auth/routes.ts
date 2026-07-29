@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { createSessionStore } from "./session.js";
@@ -15,10 +15,17 @@ type AuthEnv = { Variables: { user: User } };
 export function createAuthRouter() {
   const sessions = createSessionStore();
 
-  const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
+  // sid cookie → session → User, or null when absent/invalid. Shared by
+  // requireAuth (Hono middleware) and the oRPC context injection in app.ts so
+  // both derive the current user through one path.
+  const resolveUser = (c: Context): User | null => {
     const sid = getCookie(c, SID);
     const userId = sid ? sessions.verify(sid) : null;
-    const user = userId ? userById(userId) : null;
+    return userId ? userById(userId) : null;
+  };
+
+  const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
+    const user = resolveUser(c);
     if (!user) return c.json({ error: "unauthenticated" }, 401);
     c.set("user", user);
     await next();
@@ -56,5 +63,5 @@ export function createAuthRouter() {
 
   router.get("/me", requireAuth, (c) => c.json({ user: c.get("user") }));
 
-  return { router, requireAuth };
+  return { router, requireAuth, resolveUser };
 }
