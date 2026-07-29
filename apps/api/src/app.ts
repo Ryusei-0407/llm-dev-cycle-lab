@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { trpcServer } from "@hono/trpc-server";
+import { RPCHandler } from "@orpc/server/fetch";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { createAuthRouter } from "./auth/routes.js";
@@ -35,16 +35,21 @@ export function createApp() {
 
   // DB config guard: tickets is now postgres-backed, so a missing DATABASE_URL
   // is a 500 db_misconfigured (same shape as the LLM provider_misconfigured
-  // guard) rather than a silent failure. Runs before the tRPC handler so no
+  // guard) rather than a silent failure. Runs before the oRPC handler so no
   // procedure attempts to connect to nowhere.
-  app.use("/api/trpc/*", async (c, next) => {
+  app.use("/api/rpc/*", async (c, next) => {
     if (!isDbConfigured()) {
       return c.json({ error: "db_misconfigured" }, 500);
     }
     await next();
   });
 
-  app.use("/api/trpc/*", trpcServer({ endpoint: "/api/trpc", router: appRouter }));
+  const rpcHandler = new RPCHandler(appRouter);
+  app.use("/api/rpc/*", async (c, next) => {
+    const { matched, response } = await rpcHandler.handle(c.req.raw, { prefix: "/api/rpc" });
+    if (matched) return c.newResponse(response.body, response);
+    await next();
+  });
 
   app.post("/api/chat", async (c) => {
     let body: unknown;

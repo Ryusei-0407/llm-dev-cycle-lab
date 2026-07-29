@@ -7,7 +7,7 @@ import { TicketList } from "@/components/ticket-list";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTRPC } from "@/lib/trpc";
+import { orpc } from "@/lib/orpc";
 
 // Auth guard: /tickets is a protected route, so resolve the session in
 // beforeLoad and redirect unauthenticated visitors to /login before any ticket
@@ -40,21 +40,20 @@ const PRIORITY_OPTIONS: { value: TicketPriority; label: string }[] = [
 ];
 
 function TicketsPage() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   // Surface load failures immediately (data-testid="tickets-load-error") instead
   // of sitting through React Query's default retry/backoff.
-  const ticketsQuery = useQuery({ ...trpc.tickets.list.queryOptions(), retry: false });
+  const ticketsQuery = useQuery({ ...orpc.tickets.list.queryOptions(), retry: false });
 
   const createMutation = useMutation(
-    trpc.tickets.create.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries(trpc.tickets.list.queryFilter()),
+    orpc.tickets.create.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.tickets.list.queryKey() }),
     }),
   );
   const setStatusMutation = useMutation(
-    trpc.tickets.setStatus.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries(trpc.tickets.list.queryFilter()),
+    orpc.tickets.setStatus.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.tickets.list.queryKey() }),
     }),
   );
 
