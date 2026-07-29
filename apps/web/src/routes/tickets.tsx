@@ -1,0 +1,124 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { type FormEvent, useState } from "react";
+import type { TicketPriority } from "@/components/ticket-list";
+import { TicketList } from "@/components/ticket-list";
+import type { TicketStatus } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useTRPC } from "@/lib/trpc";
+
+export const Route = createFileRoute("/tickets")({
+  component: TicketsPage,
+});
+
+const PRIORITY_OPTIONS: { value: TicketPriority; label: string }[] = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+];
+
+function TicketsPage() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  // Surface load failures immediately (data-testid="tickets-load-error") instead
+  // of sitting through React Query's default retry/backoff.
+  const ticketsQuery = useQuery({ ...trpc.tickets.list.queryOptions(), retry: false });
+
+  const createMutation = useMutation(
+    trpc.tickets.create.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries(trpc.tickets.list.queryFilter()),
+    }),
+  );
+  const setStatusMutation = useMutation(
+    trpc.tickets.setStatus.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries(trpc.tickets.list.queryFilter()),
+    }),
+  );
+
+  const [showForm, setShowForm] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [priority, setPriority] = useState<TicketPriority>("medium");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    const trimmed = subject.trim();
+    if (trimmed.length < 1 || trimmed.length > 200) {
+      setFormError("Subject must be between 1 and 200 characters.");
+      return;
+    }
+    setFormError(null);
+    createMutation.mutate(
+      { subject: trimmed, priority },
+      {
+        onSuccess: () => {
+          setSubject("");
+          setPriority("medium");
+          setShowForm(false);
+        },
+        onError: () => setFormError("Failed to create ticket."),
+      },
+    );
+  };
+
+  const onStatusChange = (id: string, status: TicketStatus) => {
+    setStatusMutation.mutate({ id, status });
+  };
+
+  return (
+    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 p-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold tracking-tight">Tickets</h1>
+        <Button type="button" onClick={() => setShowForm((v) => !v)}>
+          New ticket
+        </Button>
+      </div>
+
+      {showForm && (
+        <form
+          onSubmit={onSubmit}
+          className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4"
+        >
+          <Input
+            aria-label="Subject"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="Describe the issue"
+          />
+          <div className="flex items-center gap-3">
+            <select
+              aria-label="Priority"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as TicketPriority)}
+              className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              {PRIORITY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <Button type="submit" disabled={createMutation.isPending}>
+              Create
+            </Button>
+          </div>
+          {formError && (
+            <p data-testid="ticket-error" role="alert" className="text-sm text-destructive">
+              {formError}
+            </p>
+          )}
+        </form>
+      )}
+
+      {ticketsQuery.isError ? (
+        <p data-testid="tickets-load-error" role="alert" className="text-sm text-destructive">
+          Failed to load tickets.
+        </p>
+      ) : (
+        <TicketList tickets={ticketsQuery.data ?? []} onStatusChange={onStatusChange} />
+      )}
+    </main>
+  );
+}
