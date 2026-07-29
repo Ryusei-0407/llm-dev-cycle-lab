@@ -11,6 +11,8 @@
     "@google/genai": "^2.13.0",
     "@hono/node-server": "^1.13.0",
     "@orpc/server": "^1.14.0",
+    "@tanstack/ai": "0.42.0",
+    "@tanstack/ai-gemini": "0.20.1",
     "hono": "^4.6.0",
     "zod": "^4.4.3"
   },
