@@ -1,3 +1,4 @@
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
@@ -15,10 +16,18 @@ type AuthEnv = { Variables: { user: User } };
 export function createAuthRouter() {
   const sessions = createSessionStore();
 
-  const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
+  // Resolve the session cookie to a user without short-circuiting — used to
+  // inject context.user into the oRPC handler (app.ts), where an absent session
+  // is a valid state (read procedures allow it; reply turns it into
+  // UNAUTHORIZED itself). requireAuth below is the enforcing variant.
+  const resolveUser = (c: Context): User | null => {
     const sid = getCookie(c, SID);
     const userId = sid ? sessions.verify(sid) : null;
-    const user = userId ? userById(userId) : null;
+    return userId ? userById(userId) : null;
+  };
+
+  const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
+    const user = resolveUser(c);
     if (!user) return c.json({ error: "unauthenticated" }, 401);
     c.set("user", user);
     await next();
@@ -56,5 +65,5 @@ export function createAuthRouter() {
 
   router.get("/me", requireAuth, (c) => c.json({ user: c.get("user") }));
 
-  return { router, requireAuth };
+  return { router, requireAuth, resolveUser };
 }
