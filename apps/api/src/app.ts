@@ -1,14 +1,25 @@
+import { GoogleGenAI } from "@google/genai";
 import { trpcServer } from "@hono/trpc-server";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { createAuthRouter } from "./auth/routes.js";
+import { GeminiProvider } from "./llm/gemini.js";
 import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
 import { appRouter } from "./tickets/router.js";
 
+// Thrown when LLM_PROVIDER selects a real provider whose required config is
+// missing. Surfaced as 500 provider_misconfigured — never a silent mock
+// fallback, so the nightly smoke lane can't go falsely green.
+class ProviderMisconfiguredError extends Error {}
+
 function getProvider(): LLMProvider {
-  // Only the mock provider exists for now. A real provider (Anthropic, etc.)
-  // slots in here behind the same interface, selected via LLM_PROVIDER.
+  const kind = process.env.LLM_PROVIDER ?? "mock";
+  if (kind === "gemini") {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new ProviderMisconfiguredError();
+    return new GeminiProvider(new GoogleGenAI({ apiKey }));
+  }
   return new MockProvider();
 }
 
@@ -40,7 +51,15 @@ export function createApp() {
       return c.json({ error: "provider failure" }, 500);
     }
 
-    const provider = getProvider();
+    let provider: LLMProvider;
+    try {
+      provider = getProvider();
+    } catch (err) {
+      if (err instanceof ProviderMisconfiguredError) {
+        return c.json({ error: "provider_misconfigured" }, 500);
+      }
+      throw err;
+    }
     return streamSSE(c, async (stream) => {
       try {
         for await (const delta of provider.stream(messages as ChatMessage[])) {

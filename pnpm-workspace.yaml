@@ -3,7 +3,9 @@ packages:
 allowBuilds:
   "@ffmpeg-installer/darwin-arm64": true
   "@ffmpeg-installer/linux-x64": true
+  "@google/genai": false
   esbuild: true
+  protobufjs: false
 # vite-plus (0.2.x) bundles its own vitest/vite; pnpm's isolated layout splits
 # @vitest/browser onto a second vite instance and breaks browser mode.
 # Hoisted layout restores npm-compatible resolution until upstream supports it.
