@@ -46,9 +46,13 @@ test.describe("tickets over tRPC @feature-tickets", () => {
   test("shows a validation error and keeps the list unchanged for an empty subject", async ({
     page,
   }, testInfo) => {
+    // 件数は絶対値でなく前後比較にする: ストアはEEラン全体で共有され、
+    // 他テストの作成分が混ざりうる(実行順・並列度に依存しない検証にする)
+    let before = 0;
     await test.step("load the tickets page", async () => {
       await page.goto("/tickets");
-      await expect(page.getByTestId("ticket-row")).toHaveCount(3);
+      await expect(page.getByTestId("ticket-row").first()).toBeVisible();
+      before = await page.getByTestId("ticket-row").count();
       await snap(page, testInfo, "初期表示");
     });
 
@@ -59,7 +63,7 @@ test.describe("tickets over tRPC @feature-tickets", () => {
 
     await test.step("see the validation error", async () => {
       await expect(page.getByTestId("ticket-error")).toBeVisible();
-      await expect(page.getByTestId("ticket-row")).toHaveCount(3);
+      await expect(page.getByTestId("ticket-row")).toHaveCount(before);
       await snap(page, testInfo, "バリデーションエラー");
     });
   });

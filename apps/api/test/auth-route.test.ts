@@ -111,6 +111,20 @@ describe("session store @feature-auth", () => {
     expect(me.status).toBe(401);
   });
 
+  it("clears the sid cookie on logout (Set-Cookie removal header)", async () => {
+    const app = createApp();
+    const res = await login(app, { email: SEED.agent.email, password: SEED.agent.password });
+    const sid = sidFrom(res);
+
+    const out = await app.request("/api/auth/logout", {
+      method: "POST",
+      headers: { cookie: `sid=${sid}` },
+    });
+    const setCookie = out.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("sid=");
+    expect(/max-age=0|expires=/i.test(setCookie)).toBe(true);
+  });
+
   it("scopes sessions per user (customer sid resolves to the customer)", async () => {
     const app = createApp();
     const res = await login(app, {
