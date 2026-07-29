@@ -15,6 +15,10 @@ const webBaseURL = `http://localhost:${webPort}`;
 export default defineConfig({
   testDir: "./tests",
   outputDir: path.join(configDir, "test-results"),
+  // Sweep away any temporary postgres container e2e-api.mjs provisioned but
+  // whose stop signal was not delivered (shell wrapping / SIGKILL on webServer
+  // teardown). Runs after all webServers are down. Spec: specs/database.md.
+  globalTeardown: path.join(configDir, "global-teardown.ts"),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -80,7 +84,11 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "pnpm --filter @app/api dev",
+      // e2e-api.mjs ensures a temporary PostgreSQL (provision locally / reset a
+      // CI service container) before starting the api and tears down anything it
+      // started on exit. Playwright launches webServers before globalSetup, so
+      // the DB must be prepared inside the server command, not a global hook.
+      command: "node scripts/e2e-api.mjs",
       cwd: root,
       port: apiPort,
       reuseExistingServer: !process.env.CI,
