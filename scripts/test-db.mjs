@@ -92,7 +92,11 @@ async function waitForReady(url, { timeoutMs = 30000, intervalMs = 250 } = {}) {
 
 // Start a throwaway postgres:18-alpine and return { url, containerName }.
 // Unique name + random host port so parallel worktrees never collide. --rm so
-// a `docker stop` (teardown) also removes it; nothing lingers.
+// a `docker stop` (teardown) also removes it; nothing lingers. Every container
+// carries the llmlab-e2e-pg label so a sweep (docker stop --filter label=...)
+// can reliably clean up even if a launcher misses its stop signal.
+export const LABEL = "llmlab-e2e-pg=1";
+
 export async function provision() {
   const port = await freePort();
   const containerName = `llmlab-pg-${process.pid}-${Math.floor(Math.random() * 1e6)}`;
@@ -102,6 +106,8 @@ export async function provision() {
     "--rm",
     "--name",
     containerName,
+    "--label",
+    LABEL,
     "-e",
     `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`,
     "-e",
