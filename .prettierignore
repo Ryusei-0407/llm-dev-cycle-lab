@@ -1,1 +1,6 @@
 apps/web/src/routeTree.gen.ts
+
+# Vendored agent skills (skills.sh) and generated intent guidance — kept
+# verbatim from upstream so the skill content is not reformatted on our style.
+.agents/
+apps/web/AGENTS.md
