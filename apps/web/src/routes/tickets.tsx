@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import type { TicketPriority } from "@/components/ticket-list";
 import { TicketList } from "@/components/ticket-list";
-import type { TicketStatus } from "@/components/status-badge";
+import type { TicketPriority, TicketStatus } from "@/lib/tickets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTRPC } from "@/lib/trpc";

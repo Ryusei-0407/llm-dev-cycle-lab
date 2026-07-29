@@ -32,10 +32,14 @@ test.describe("tickets over tRPC @feature-tickets", () => {
     // just-created ticket; the three seeds follow.
     await expect(page.getByTestId("ticket-list")).toMatchAriaSnapshot(`
       - list:
-        - listitem: /Printer on fire/
-        - listitem: /Feature request: dark mode/
-        - listitem: /Billing question/
-        - listitem: /Cannot login to dashboard/
+        - listitem:
+          - text: /Printer on fire/
+        - listitem:
+          - text: /Feature request/
+        - listitem:
+          - text: /Billing question/
+        - listitem:
+          - text: /Cannot login to dashboard/
     `);
   });
 

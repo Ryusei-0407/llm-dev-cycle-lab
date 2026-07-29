@@ -1,15 +1,5 @@
-import { StatusBadge, type TicketStatus } from "@/components/status-badge";
-
-export type TicketPriority = "low" | "medium" | "high";
-
-export type Ticket = {
-  id: string;
-  subject: string;
-  status: TicketStatus;
-  priority: TicketPriority;
-  requesterEmail: string;
-  createdAt: string;
-};
+import { StatusBadge } from "@/components/status-badge";
+import type { Ticket, TicketStatus } from "@/lib/tickets";
 
 const STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [
   { value: "open", label: "Open" },

@@ -1,7 +1,6 @@
 import type { ComponentProps } from "react";
+import type { TicketStatus } from "@/lib/tickets";
 import { cn } from "@/lib/utils";
-
-export type TicketStatus = "open" | "in_progress" | "resolved";
 
 const LABELS: Record<TicketStatus, string> = {
   open: "Open",

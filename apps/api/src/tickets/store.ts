@@ -1,3 +1,5 @@
+import { createInput, type SetStatusInput } from "./schema.js";
+
 export type TicketStatus = "open" | "in_progress" | "resolved";
 export type TicketPriority = "low" | "medium" | "high";
 
@@ -36,7 +38,7 @@ const SEEDS: Omit<Ticket, "id">[] = [
   },
 ];
 
-export class TicketStore {
+class TicketStore {
   private tickets: Ticket[];
 
   constructor() {
@@ -49,11 +51,14 @@ export class TicketStore {
   }
 
   create(input: { subject: string; priority: TicketPriority }): Ticket {
+    // Validate at the store boundary so direct callers (unit tests) get the same
+    // guarantees the tRPC input layer enforces.
+    const parsed = createInput.parse(input);
     const ticket: Ticket = {
       id: crypto.randomUUID(),
-      subject: input.subject,
+      subject: parsed.subject,
       status: "open",
-      priority: input.priority,
+      priority: parsed.priority,
       requesterEmail: "customer@example.com",
       createdAt: new Date().toISOString(),
     };
@@ -61,14 +66,22 @@ export class TicketStore {
     return ticket;
   }
 
-  setStatus(id: string, status: TicketStatus): Ticket | undefined {
+  setStatus({ id, status }: SetStatusInput): Ticket {
     const ticket = this.tickets.find((t) => t.id === id);
-    if (!ticket) return undefined;
+    if (!ticket) {
+      throw new Error(`NOT_FOUND: ticket ${id}`);
+    }
     ticket.status = status;
     return ticket;
   }
 }
 
+// Factory: each call yields an isolated in-memory store (unit tests rely on
+// this for a clean seed per case).
+export function createTicketStore(): TicketStore {
+  return new TicketStore();
+}
+
 // Single process-wide store: the in-memory tickets survive across requests for
 // the lifetime of the dev/E2E server.
-export const ticketStore = new TicketStore();
+export const ticketStore = createTicketStore();
