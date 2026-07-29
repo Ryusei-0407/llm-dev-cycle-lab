@@ -99,7 +99,7 @@ function analyzeTrace(zipPath) {
 const zips = findTraceZips(rootDir);
 if (zips.length === 0) {
   console.error(`no trace zips found under ${rootDir}`);
-  console.error("run: PW_TRACE=on npm run e2e  (or download the perf-traces artifact)");
+  console.error("run: pnpm e2e:perf  (or download the perf-traces artifact)");
   process.exit(1);
 }
 
