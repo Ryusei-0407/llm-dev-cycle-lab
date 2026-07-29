@@ -11,13 +11,18 @@ const devtools = process.env.DEVTOOLS
   ? [DevTools({ visibility: "passive" }) as unknown as PluginOption]
   : [];
 
+// Ports are env-driven so parallel git worktrees can run E2E without
+// colliding (WEB_PORT/API_PORT). Defaults match the historical fixed ports.
+const webPort = Number(process.env.WEB_PORT ?? 5173);
+const apiPort = Number(process.env.API_PORT ?? 8787);
+
 export default defineConfig({
   plugins: [react() as unknown as PluginOption, ...devtools],
   server: {
-    port: 5173,
+    port: webPort,
     strictPort: true,
     proxy: {
-      "/api": "http://localhost:8787",
+      "/api": `http://localhost:${apiPort}`,
     },
   },
   test: {
