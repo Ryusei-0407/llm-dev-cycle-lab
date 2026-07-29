@@ -49,6 +49,11 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
+    // Auth setup: logs the seed roles in once and writes storageState to
+    // e2e/.auth/<role>.json. Deliberately NOT yet a dependency of the chromium
+    // project — the existing @feature-chat tests run unauthenticated until the
+    // auth guard is integrated in a later phase (specs/auth.md).
+    { name: "setup", testDir: path.join(configDir, "setup"), testMatch: /.*\.setup\.ts/ },
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     // Playwright component tests (stories & galleries): reserved for cases
     // Vitest Browser Mode cannot cover — page.clock, page.route, video/trace
