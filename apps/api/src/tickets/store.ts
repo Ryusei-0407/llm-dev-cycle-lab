@@ -19,8 +19,8 @@ export type CreateTicketInput = {
   requesterEmail: string;
 };
 
-// Thrown by setStatus when no row matches the id, so the router can map it to a
-// tRPC NOT_FOUND without string-matching an error message.
+// Thrown by setStatus when no row matches the id, so the router can map it to an
+// oRPC NOT_FOUND without string-matching an error message.
 export class NotFoundError extends Error {
   constructor(id: string) {
     super(`NOT_FOUND: ticket ${id}`);
@@ -64,7 +64,7 @@ export function createTicketStore(pool: Pool) {
       return rows.map(toTicket);
     },
 
-    // Validate subject/priority at the store boundary (same guarantee the tRPC
+    // Validate subject/priority at the store boundary (same guarantee the oRPC
     // input layer gives) so a bad subject rejects before touching the DB and
     // the row count stays put. id + created_at come from the DB defaults
     // (uuidv7(), now()) via RETURNING — the app never generates the id.
