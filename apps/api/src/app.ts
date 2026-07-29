@@ -1,8 +1,10 @@
+import { trpcServer } from "@hono/trpc-server";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { createAuthRouter } from "./auth/routes.js";
 import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
+import { appRouter } from "./tickets/router.js";
 
 function getProvider(): LLMProvider {
   // Only the mock provider exists for now. A real provider (Anthropic, etc.)
@@ -19,6 +21,8 @@ export function createApp() {
   // /api/auth/* requests against one createApp() share it.
   const { router: authRouter } = createAuthRouter();
   app.route("/api/auth", authRouter);
+
+  app.use("/api/trpc/*", trpcServer({ endpoint: "/api/trpc", router: appRouter }));
 
   app.post("/api/chat", async (c) => {
     let body: unknown;

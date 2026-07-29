@@ -1,4 +1,4 @@
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { logout, type User } from "./api";
 
@@ -19,7 +19,16 @@ export function TopNav({ user }: { user: User }) {
       data-testid="top-nav"
       className="flex h-14 items-center justify-between border-b border-border px-4"
     >
-      <span className="text-sm font-medium tracking-tight">サポートデスク</span>
+      <div className="flex items-center gap-4">
+        <span className="text-sm font-medium tracking-tight">サポートデスク</span>
+        <Link
+          data-testid="nav-tickets"
+          to="/tickets"
+          className="text-sm text-muted-foreground transition-colors hover:text-foreground [&.active]:text-foreground"
+        >
+          Tickets
+        </Link>
+      </div>
       <div className="flex items-center gap-3">
         <span data-testid="current-user" className="text-sm text-muted-foreground">
           {user.name}
