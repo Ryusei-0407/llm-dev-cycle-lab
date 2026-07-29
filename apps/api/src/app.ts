@@ -29,7 +29,8 @@ export function createApp() {
   app.get("/api/health", (c) => c.json({ ok: true }));
 
   // Session store lives for the life of this app instance (in-memory), so all
-  // /api/auth/* requests against one createApp() share it.
+  // /api/auth/* requests against one createApp() share it. resolveUser reads the
+  // same store to inject the session user into the oRPC context below.
   const { router: authRouter, resolveUser } = createAuthRouter();
   app.route("/api/auth", authRouter);
 
@@ -46,6 +47,9 @@ export function createApp() {
 
   const rpcHandler = new RPCHandler(appRouter);
   app.use("/api/rpc/*", async (c, next) => {
+    // Inject the resolved session user so procedures (tickets.create/reply) can
+    // author from context instead of trusting client input. Null when
+    // unauthenticated.
     const { matched, response } = await rpcHandler.handle(c.req.raw, {
       prefix: "/api/rpc",
       context: { user: resolveUser(c) },

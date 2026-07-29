@@ -1,4 +1,5 @@
-import { Hono, type Context } from "hono";
+import type { Context } from "hono";
+import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { createSessionStore } from "./session.js";
@@ -17,7 +18,10 @@ export function createAuthRouter() {
 
   // sid cookie → session → User, or null when absent/invalid. Shared by
   // requireAuth (Hono middleware) and the oRPC context injection in app.ts so
-  // both derive the current user through one path.
+  // both derive the current user through one path. Here it does not
+  // short-circuit: an absent session is a valid state for the oRPC context
+  // (read procedures allow null; create/reply turn it into UNAUTHORIZED
+  // themselves). requireAuth below is the enforcing variant.
   const resolveUser = (c: Context): User | null => {
     const sid = getCookie(c, SID);
     const userId = sid ? sessions.verify(sid) : null;
