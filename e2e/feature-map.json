@@ -16,6 +16,8 @@
   ],
   "tickets": [
     "apps/api/src/tickets/**",
+    "apps/api/src/db.ts",
+    "apps/api/db/**",
     "apps/web/src/components/ticket-*",
     "apps/web/src/components/status-badge.tsx",
     "apps/web/src/routes/tickets.tsx",
