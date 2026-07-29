@@ -170,3 +170,43 @@ describe("POST /api/tickets/draft @feature-reply-draft", () => {
     },
   );
 });
+
+describe("draft prompt assembly @feature-reply-draft", () => {
+  it(
+    "includes the subject and every thread message body in the prompt",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "ドラフト生成プロンプトに件名とスレッド全メッセージの本文が含まれることを直接検証(会話文脈の中核保証)",
+      },
+    },
+    async () => {
+      const { buildDraftMessages } = await import("../src/tickets/draft.js");
+      const ticket = {
+        subject: "Cannot login to dashboard",
+        status: "open",
+        priority: "high",
+        requesterEmail: "customer@example.com",
+      };
+      const thread = [
+        {
+          authorRole: "customer",
+          authorEmail: "customer@example.com",
+          body: "It says invalid credentials.",
+        },
+        {
+          authorRole: "agent",
+          authorEmail: "agent@example.com",
+          body: "Did you change your password?",
+        },
+      ];
+      const messages = buildDraftMessages(ticket as never, thread as never);
+      const content = messages.map((m) => m.content).join("\n");
+      expect(content).toContain(ticket.subject);
+      for (const message of thread) {
+        expect(content).toContain(message.body);
+      }
+    },
+  );
+});
