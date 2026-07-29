@@ -17,7 +17,7 @@ export function App() {
   };
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-4 p-4">
+    <main className="mx-auto flex min-h-[calc(100dvh-3.5rem)] max-w-2xl flex-col gap-4 p-4">
       <h1 className="text-xl font-semibold tracking-tight">LLM Dev-Cycle Lab Chat</h1>
       {state.error && (
         <div

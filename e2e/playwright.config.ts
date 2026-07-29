@@ -95,6 +95,9 @@ export default defineConfig({
       env: {
         ...(process.env as Record<string, string>),
         API_PORT: String(apiPort),
+        // E2E はモック強制なので .env(1Password FIFO)を読まない — 人間の
+        // 1Password 解錠状態にテストが依存しないようにする
+        API_ENV_FILE: ".env.e2e-none",
         MOCK_DELAY_MS: "20",
         // Force the provider for the test lane: real Gemini only under the
         // explicit LLM_SMOKE=1 nightly opt-in, mock otherwise. This overrides
