@@ -34,5 +34,12 @@
     "apps/web/src/components/message-*",
     "apps/web/src/lib/orpc.ts"
   ],
-  "slow-hint": ["apps/web/src/chat/useChat.ts", "apps/web/src/App.story.tsx"]
+  "slow-hint": ["apps/web/src/chat/useChat.ts", "apps/web/src/App.story.tsx"],
+  "reply-draft": [
+    "apps/api/src/tickets/draft.ts",
+    "apps/api/src/app.ts",
+    "apps/api/src/llm/**",
+    "apps/web/src/components/draft-panel.tsx",
+    "apps/web/src/routes/tickets_.$id.tsx"
+  ]
 }
