@@ -24,5 +24,15 @@
     "apps/web/src/lib/tickets.ts",
     "apps/web/src/lib/orpc.ts"
   ],
+  "ticket-detail": [
+    "apps/api/src/tickets/messages.ts",
+    "apps/api/src/tickets/schema.ts",
+    "apps/api/src/tickets/router.ts",
+    "apps/api/db/**",
+    "apps/web/src/routes/tickets.$id.tsx",
+    "apps/web/src/components/ticket-*",
+    "apps/web/src/components/message-*",
+    "apps/web/src/lib/orpc.ts"
+  ],
   "slow-hint": ["apps/web/src/chat/useChat.ts", "apps/web/src/App.story.tsx"]
 }
