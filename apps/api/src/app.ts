@@ -6,7 +6,8 @@ import { createAuthRouter } from "./auth/routes.js";
 import { GeminiProvider } from "./llm/gemini.js";
 import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
-import { appRouter, isDbConfigured } from "./tickets/router.js";
+import { createDraftRouter } from "./tickets/draft.js";
+import { appRouter, getMessageStore, getStore, isDbConfigured } from "./tickets/router.js";
 
 // Thrown when LLM_PROVIDER selects a real provider whose required config is
 // missing. Surfaced as 500 provider_misconfigured — never a silent mock
@@ -57,6 +58,20 @@ export function createApp() {
     if (matched) return c.newResponse(response.body, response);
     await next();
   });
+
+  // reply-draft (spec: specs/reply-draft.md): POST /api/tickets/draft streams an
+  // LLM reply draft as SSE. Same DB guard as /api/rpc/* — a missing DATABASE_URL
+  // is 500 db_misconfigured before any store query, never a silent failure.
+  app.use("/api/tickets/*", async (c, next) => {
+    if (!isDbConfigured()) {
+      return c.json({ error: "db_misconfigured" }, 500);
+    }
+    await next();
+  });
+  app.route(
+    "/api/tickets",
+    createDraftRouter({ resolveUser, ticketStore: getStore, messageStore: getMessageStore }),
+  );
 
   app.post("/api/chat", async (c) => {
     let body: unknown;

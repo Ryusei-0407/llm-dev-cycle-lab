@@ -4,6 +4,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { fetchMe } from "@/auth/api";
 import { TopNav } from "@/auth/TopNav";
+import { DraftPanel } from "@/components/draft-panel";
 import { MessageThread } from "@/components/message-thread";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -115,6 +116,16 @@ function TicketDetailPage() {
       )}
 
       <MessageThread messages={messages} />
+
+      <DraftPanel
+        ticketId={id}
+        onUseDraft={(text) => {
+          // Use draft overwrites the current reply (spec: 既存入力は上書き) and
+          // clears any stale empty-reply error.
+          setBody(text);
+          setReplyError(null);
+        }}
+      />
 
       <form
         onSubmit={onSubmit}

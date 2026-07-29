@@ -36,14 +36,18 @@ function requireUrl(): string {
   return url;
 }
 
-function getStore(): TicketStore {
+// Exported so the reply-draft Hono route (tickets/draft.ts) reads through the
+// same lazy, process-wide pool + stores rather than opening its own — the DB
+// guard in app.ts still runs first, so a missing DATABASE_URL never reaches a
+// query.
+export function getStore(): TicketStore {
   if (!ticketStore) {
     ticketStore = createTicketStore(createPool(requireUrl()));
   }
   return ticketStore;
 }
 
-function getMessageStore(): MessageStore {
+export function getMessageStore(): MessageStore {
   if (!messageStore) {
     messageStore = createMessageStore(createPool(requireUrl()));
   }
