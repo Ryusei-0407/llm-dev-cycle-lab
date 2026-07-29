@@ -16,6 +16,9 @@ docs/POLICY.md に従ってください。
 2. **書いたテストは必ず実行し、期待どおり失敗する(RED)ことを確認してから完了とする。**
    パスしてしまうテストは検証力がない
 
+各テストには日本語の `description` annotation を付け、新しい `@feature-<name>` タグを
+使うときは `e2e/feature-map.json` にコードパス glob を登録する(docs/POLICY.md 共通規約)。
+
 完了前に `node scripts/verify-conventions.mjs` を実行し、規約違反ゼロを確認する
 (違反があれば直してから完了報告する)。
 

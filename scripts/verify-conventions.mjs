@@ -2,7 +2,7 @@
 // Deterministic verification of the project-specific test conventions from
 // docs/POLICY.md — the rules generic linters cannot check. Exit 1 on any
 // violation. Wired into `pnpm check`, the pre-commit hook, and CI.
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 const violations = [];
@@ -120,6 +120,43 @@ for (const [feature, { count, file }] of featureCounts) {
   }
 }
 
+// Rule 7: every @feature-<name> tag used in a spec must have an entry in
+// e2e/feature-map.json (glob → code paths), so the PR media comment can scope
+// media to the tests whose feature was actually touched.
+const MAP_PATH = "e2e/feature-map.json";
+const featureMap = existsSync(MAP_PATH) ? JSON.parse(readFileSync(MAP_PATH, "utf8")) : {};
+for (const file of allSpecFiles) {
+  const source = readFileSync(file, "utf8");
+  for (const match of source.matchAll(/@feature-([\w-]+)/g)) {
+    const name = match[1];
+    if (!Object.prototype.hasOwnProperty.call(featureMap, name)) {
+      report(
+        file,
+        lineOf(source, match.index),
+        "feature-map",
+        `@feature-${name} に対応するエントリが ${MAP_PATH} に無い(コードパスの glob を登録する)`,
+      );
+    }
+  }
+}
+
+// Rule 8: every test must carry a Japanese description annotation, so the PR
+// media comment can explain each test in prose. Enforced structurally: the
+// count of test( calls must equal the count of type: "description" annotations.
+for (const file of allSpecFiles) {
+  const source = readFileSync(file, "utf8");
+  const testCount = [...source.matchAll(/^\s*test\(/gm)].length;
+  const descCount = [...source.matchAll(/type:\s*["']description["']/g)].length;
+  if (testCount !== descCount) {
+    report(
+      file,
+      1,
+      "test-description",
+      `test の数(${testCount})と description annotation の数(${descCount})が不一致(全テストに日本語 description が必要)`,
+    );
+  }
+}
+
 if (violations.length > 0) {
   console.error(`verify-conventions: ${violations.length} violation(s)\n`);
   for (const violation of violations) console.error(`  ${violation}`);
@@ -127,5 +164,5 @@ if (violations.length > 0) {
   process.exit(1);
 }
 console.log(
-  `verify-conventions: OK (${allSpecFiles.length + browserTestFiles.length} test files, ${featureCounts.size} feature(s))`,
+  `verify-conventions: OK (${allSpecFiles.length + browserTestFiles.length} test files, ${featureCounts.size} feature(s), ${Object.keys(featureMap).length} feature-map entrie(s))`,
 );
