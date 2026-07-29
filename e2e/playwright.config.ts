@@ -49,7 +49,22 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // Auth setup: logs the seed roles in once and writes storageState to
+    // e2e/.auth/<role>.json, so feature projects start already authenticated.
+    // The auth guard now protects "/", so every feature test (chat included)
+    // needs a session; the guard itself is exercised unauthenticated by
+    // auth.spec.ts, which overrides storageState per-describe.
+    { name: "setup", testDir: path.join(configDir, "setup"), testMatch: /.*\.setup\.ts/ },
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        // Default every chromium test to the seeded agent session. auth.spec.ts
+        // opts back out to an empty state to test the guard/login flow.
+        storageState: path.join(configDir, ".auth", "agent.json"),
+      },
+      dependencies: ["setup"],
+    },
     // Playwright component tests (stories & galleries): reserved for cases
     // Vitest Browser Mode cannot cover — page.clock, page.route, video/trace
     // evidence at component level. See docs/POLICY.md for the layer rules.
