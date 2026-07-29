@@ -5,6 +5,13 @@ import { fileURLToPath } from "node:url";
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(configDir, "..");
 
+// Ports are env-driven (WEB_PORT/API_PORT) so parallel git worktrees can run
+// E2E without colliding. Defaults match the historical fixed ports; the web
+// dev server proxies /api to API_PORT (apps/web/vite.config.ts reads the same).
+const webPort = Number(process.env.WEB_PORT ?? 5173);
+const apiPort = Number(process.env.API_PORT ?? 8787);
+const webBaseURL = `http://localhost:${webPort}`;
+
 export default defineConfig({
   testDir: "./tests",
   outputDir: path.join(configDir, "test-results"),
@@ -25,7 +32,7 @@ export default defineConfig({
         ["list"],
       ],
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: webBaseURL,
     // PW_TRACE=on is the nightly perf lane: record everything so the
     // trace-analyst can mine timings. Default stays cheap for the PR lane.
     trace: process.env.PW_TRACE === "on" ? "on" : "on-first-retry",
@@ -51,7 +58,7 @@ export default defineConfig({
       testDir: path.join(configDir, "components"),
       use: {
         ...devices["Desktop Chrome"],
-        baseURL: "http://localhost:5173/playwright/gallery/index.html",
+        baseURL: `${webBaseURL}/playwright/gallery/index.html`,
         serviceWorkers: "block",
       },
     },
@@ -60,19 +67,24 @@ export default defineConfig({
     {
       command: "pnpm --filter @app/api dev",
       cwd: root,
-      port: 8787,
+      port: apiPort,
       reuseExistingServer: !process.env.CI,
       env: {
         ...(process.env as Record<string, string>),
-        PORT: "8787",
+        API_PORT: String(apiPort),
         MOCK_DELAY_MS: "20",
       },
     },
     {
       command: "pnpm --filter @app/web dev",
       cwd: root,
-      port: 5173,
+      port: webPort,
       reuseExistingServer: !process.env.CI,
+      env: {
+        ...(process.env as Record<string, string>),
+        WEB_PORT: String(webPort),
+        API_PORT: String(apiPort),
+      },
     },
   ],
 });
