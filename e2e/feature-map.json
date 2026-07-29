@@ -1,0 +1,25 @@
+{
+  "auth": [
+    "apps/api/src/auth/**",
+    "apps/web/src/auth/**",
+    "apps/web/src/routes/login.tsx",
+    "apps/web/src/routes/__root.tsx",
+    "e2e/setup/**",
+    "e2e/helpers/auth.ts"
+  ],
+  "chat": [
+    "apps/api/src/llm/**",
+    "apps/api/src/app.ts",
+    "apps/web/src/chat/**",
+    "apps/web/src/App.tsx",
+    "apps/web/src/routes/index.tsx"
+  ],
+  "tickets": [
+    "apps/api/src/tickets/**",
+    "apps/web/src/components/ticket-*",
+    "apps/web/src/components/status-badge.tsx",
+    "apps/web/src/routes/tickets.tsx",
+    "apps/web/src/lib/tickets.ts"
+  ],
+  "slow-hint": ["apps/web/src/chat/useChat.ts", "apps/web/src/App.story.tsx"]
+}

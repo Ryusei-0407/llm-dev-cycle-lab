@@ -13,28 +13,34 @@ declare global {
 // must be driven deterministically, and Playwright's clock replaces timers at
 // the context level before any page code runs.
 test.describe("slow-hint @component @feature-slow-hint", () => {
-  test("appears after 10s of stalled streaming and clears on completion", async ({
-    page,
-    mount,
-  }) => {
-    await page.clock.install();
-    const component = await mount("App/StalledStream");
+  test(
+    "appears after 10s of stalled streaming and clears on completion",
+    {
+      annotation: {
+        type: "description",
+        description: "ストリーミングが10秒停滞するとヒントが表示され完了で消えることを検証",
+      },
+    },
+    async ({ page, mount }) => {
+      await page.clock.install();
+      const component = await mount("App/StalledStream");
 
-    await component.getByLabel("Message").fill("Hello");
-    await component.getByRole("button", { name: "Send" }).click();
+      await component.getByLabel("Message").fill("Hello");
+      await component.getByRole("button", { name: "Send" }).click();
 
-    // Not shown before the threshold…
-    await expect(component.getByTestId("slow-hint")).toBeHidden();
-    await page.clock.fastForward(10_000);
-    // …shown once streaming has stalled past it.
-    await expect(component.getByTestId("slow-hint")).toBeVisible();
+      // Not shown before the threshold…
+      await expect(component.getByTestId("slow-hint")).toBeHidden();
+      await page.clock.fastForward(10_000);
+      // …shown once streaming has stalled past it.
+      await expect(component.getByTestId("slow-hint")).toBeVisible();
 
-    // Completing the stream clears the hint and renders the reply.
-    await page.evaluate(() => {
-      window.__stream.push("Late reply");
-      window.__stream.done();
-    });
-    await expect(component.getByTestId("message-assistant")).toContainText("Late reply");
-    await expect(component.getByTestId("slow-hint")).toBeHidden();
-  });
+      // Completing the stream clears the hint and renders the reply.
+      await page.evaluate(() => {
+        window.__stream.push("Late reply");
+        window.__stream.done();
+      });
+      await expect(component.getByTestId("message-assistant")).toContainText("Late reply");
+      await expect(component.getByTestId("slow-hint")).toBeHidden();
+    },
+  );
 });

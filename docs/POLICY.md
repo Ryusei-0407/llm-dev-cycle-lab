@@ -67,6 +67,10 @@ LLMへの「お願い」は忘れられる。守らせたいものは構造(hook
   `@component`(CT)/ `@quarantine`(flaky隔離、nightlyのみ・ゲート外)/
   `@pinned`(反証フェーズで固定されたテスト。E2E本数上限の免除根拠)
 - 接続情報・環境依存の値をテストコードに書かない(設定・環境変数で差し替え可能に保つ)
+- テストには日本語の `description` annotation を付ける(`test("...", { annotation: { type: "description", description: "…を検証" } }, async …)`)。
+  「何を検証するか」を1文で。PRメディアコメントが各テストの説明として表示する
+- `@feature-<name>` タグは `e2e/feature-map.json`(feature → コードパス glob)に登録する。
+  PRメディアコメントはこのマップで「変更が触れた機能のテスト」だけにメディアを絞る
 
 この規約のうち決定論的に判定できるものは `scripts/verify-conventions.mjs` が
 機械的に強制する(`pnpm check`・pre-commit・CI に組み込み済み)。規約を増やすときは
