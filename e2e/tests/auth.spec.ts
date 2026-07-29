@@ -4,9 +4,12 @@ import { SEED_USERS } from "../helpers/auth";
 
 // Auth E2E against the real API — the store is self-implemented and
 // deterministic (specs/auth.md), so no mocking is needed. These tests verify
-// the login/guard plumbing (form → session → redirect), not content. Each test
-// runs unauthenticated: no storageState is attached to this project.
+// the login/guard plumbing (form → session → redirect), not content. The
+// chromium project defaults to the seeded agent session, so this describe opts
+// back out to an empty state — the login/guard flow must start unauthenticated.
 test.describe("auth @feature-auth", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("agent signs in and lands on the desk @smoke", async ({ page }, testInfo) => {
     await test.step("visit the login page", async () => {
       await page.goto("/login");
