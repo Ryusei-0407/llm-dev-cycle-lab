@@ -29,7 +29,9 @@ export interface GeminiClient {
   };
 }
 
-const MODEL = "gemini-2.5-flash";
+// gemini-flash-latest は常に現行世代を指すエイリアス。固定名(例: gemini-2.5-flash)は
+// 新規キーに対して提供終了となり 404 を返すことがある(2026-07 に実測)
+const MODEL = process.env.GEMINI_MODEL ?? "gemini-flash-latest";
 
 export class GeminiProvider implements LLMProvider {
   constructor(private readonly client: GeminiClient) {}

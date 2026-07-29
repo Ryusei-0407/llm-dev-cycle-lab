@@ -12,7 +12,7 @@
 ## GeminiProvider(apps/api/src/llm/gemini.ts)
 
 - `LLMProvider` インターフェースを実装(`stream(messages): AsyncIterable<string>`)
-- SDK: `@google/genai`(公式)。モデル: `gemini-2.5-flash`
+- SDK: `@google/genai`(公式)。モデル: `GEMINI_MODEL` 環境変数(デフォルト `gemini-flash-latest` — 常に現行世代を指すエイリアス。固定名はキーの世代によって提供終了 404 になるため使わない)
 - messages(role user/assistant)を Gemini の contents 形式に変換して streaming 呼び出し、
   チャンクの text を delta として yield
 - ストリーム中のAPIエラーは throw(既存 app.ts の catch → `stream_failed` イベットに載る)

@@ -63,11 +63,11 @@ describe("GeminiProvider", () => {
     await expect(collect(provider.stream(HELLO))).rejects.toThrow("gemini upstream exploded");
   });
 
-  it("requests the gemini-2.5-flash model", async () => {
+  it("requests the gemini-flash-latest model by default", async () => {
     const { client, calls } = fakeClient(() => fromChunks([{ text: "x" }]));
     const provider = new GeminiProvider(client);
     await collect(provider.stream(HELLO));
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.model).toBe("gemini-2.5-flash");
+    expect(calls[0]?.model).toBe("gemini-flash-latest");
   });
 });
