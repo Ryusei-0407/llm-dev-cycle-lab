@@ -94,7 +94,7 @@ test.describe("tickets over tRPC @feature-tickets", () => {
       },
     },
     async ({ page }, testInfo) => {
-      await page.route("**/api/trpc/**", (route) =>
+      await page.route("**/api/rpc/**", (route) =>
         route.fulfill({
           status: 500,
           contentType: "application/json",

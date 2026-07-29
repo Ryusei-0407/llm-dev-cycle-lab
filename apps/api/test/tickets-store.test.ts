@@ -350,7 +350,11 @@ describe("db guards @feature-tickets", () => {
       delete process.env.DATABASE_URL;
       try {
         const { createApp } = await import("../src/app.js");
-        const res = await createApp().request("/api/trpc/tickets.list?batch=1&input=%7B%7D");
+        const res = await createApp().request("/api/rpc/tickets/list", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{}",
+        });
         expect(res.status).toBe(500);
         expect(await res.json()).toEqual({ error: "db_misconfigured" });
       } finally {

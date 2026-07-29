@@ -21,7 +21,8 @@
     "apps/web/src/components/ticket-*",
     "apps/web/src/components/status-badge.tsx",
     "apps/web/src/routes/tickets.tsx",
-    "apps/web/src/lib/tickets.ts"
+    "apps/web/src/lib/tickets.ts",
+    "apps/web/src/lib/orpc.ts"
   ],
   "slow-hint": ["apps/web/src/chat/useChat.ts", "apps/web/src/App.story.tsx"]
 }

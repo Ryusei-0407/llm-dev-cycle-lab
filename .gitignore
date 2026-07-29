@@ -18,4 +18,5 @@ e2e/.auth/
 e2e/media-out/
 apps/web/test-browser/__screenshots__/
 *.log
+worklog.md
 .DS_Store
