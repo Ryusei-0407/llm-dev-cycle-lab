@@ -87,6 +87,7 @@ function walkSuite(suite, crumbs) {
         status: test.status ?? result.status,
         durationMs: result.duration ?? 0,
         attachments: (result.attachments ?? []).filter((a) => a.path),
+        error: result.errors?.[0]?.message ?? result.error?.message ?? null,
         description,
         specFile: spec.file ? specFileToRepoPath(spec.file) : undefined,
       });
@@ -331,6 +332,11 @@ function buildComment() {
   if (flaky) md += ` · **⚠️ ${flaky} flaky**`;
   md += ` · 合計 ${totalSec}s`;
   md += ` · [CI run](https://github.com/${repo}/actions/runs/${runId})\n\n`;
+  if (failed > 0) {
+    md += `> [!CAUTION]\n> ❌ **${failed}本のテストが失敗しています。** 下の「失敗」セクションにエラー内容と証跡があります。\n\n`;
+  } else {
+    md += `> [!TIP]\n> ✅ すべてのテストが成功しています。\n\n`;
+  }
   if (scopingActive) {
     md += `各テストを開くと、実行全体の録画と、操作段階ごとのスクリーンショットが見られます。`;
     md += `**メディアは変更関連のテストのみ表示**(失敗は関連に関わらず全表示)。\n\n`;
@@ -338,54 +344,67 @@ function buildComment() {
     md += `各テストを開くと、実行全体の録画と、操作段階ごとのスクリーンショットが見られます。\n\n`;
   }
 
-  // ファイル → describe → テスト のツリー表示。失敗を含むファイル・テストを先頭に。
+  // ファイル → describe → テスト のツリー表示。失敗セクションを成功と分離して先頭に。
   const stripTags = (text) => text.replace(/\s*@[\w-]+/g, "").trim();
   const displayFile = (text) => text.replace(/^(\.\.\/)+/, "");
-  const fileOrder = [];
-  const byFile = new Map();
-  for (const test of detailed) {
-    const key = test.fileTitle ?? "(unknown)";
-    if (!byFile.has(key)) {
-      byFile.set(key, []);
-      fileOrder.push(key);
+  const stripAnsi = (text) => text.replace(/\u001b\[[0-9;]*m/g, "");
+  const renderTree = (subset) => {
+    const fileOrder = [];
+    const byFile = new Map();
+    for (const test of subset) {
+      const key = test.fileTitle ?? "(unknown)";
+      if (!byFile.has(key)) {
+        byFile.set(key, []);
+        fileOrder.push(key);
+      }
+      byFile.get(key).push(test);
     }
-    byFile.get(key).push(test);
-  }
-  fileOrder.sort(
-    (a, b) => Number(byFile.get(b).some(isFailure)) - Number(byFile.get(a).some(isFailure)),
-  );
+    for (const fileTitle of fileOrder) {
+      md += `### 📄 ${displayFile(fileTitle)}\n\n`;
+      let lastDescribe = null;
+      for (const test of byFile.get(fileTitle)) {
+        const describe = stripTags(test.describePath ?? "");
+        if (describe && describe !== lastDescribe) {
+          md += `**${describe}**\n\n`;
+          lastDescribe = describe;
+        }
+        const media = test.media ?? { screenshots: [], gifs: [] };
+        const tags = [...new Set(test.title.match(/@[\w-]+/g) ?? [])];
+        const tagBadges = tags.map((t) => `<code>${t}</code>`).join(" ");
+        const descLine = test.description ? `<br>📝 ${test.description}` : "";
+        md += `<details${isFailure(test) ? " open" : ""}><summary>${icon[test.status] ?? "❔"} <b>${stripTags(test.leaf ?? test.title)}</b> ${tagBadges} <em>(${(test.durationMs / 1000).toFixed(1)}s)</em>${descLine}</summary>\n\n`;
+        if (isFailure(test) && test.error) {
+          const excerpt = stripAnsi(test.error).split("\n").slice(0, 6).join("\n");
+          md += `> [!CAUTION]\n`;
+          for (const line of excerpt.split("\n")) md += `> ${line}\n`;
+          md += `\n`;
+        }
+        if (media.screenshots.length === 0 && media.gifs.length === 0) {
+          md += `_このテストのメディアはありません_\n`;
+        }
+        for (const gif of media.gifs) {
+          md += `#### 📹 実行の録画\n\n![録画](${blobBase}/${toRepoPath(gif)}?raw=true)\n\n`;
+        }
+        if (media.screenshots.length > 0) {
+          md += `#### 🖼️ 画面の遷移(操作順)\n\n`;
+          media.screenshots.forEach(({ file: shot, label }, i) => {
+            md += `**Step ${i + 1}: ${label}**\n\n![${label}](${blobBase}/${toRepoPath(shot)}?raw=true)\n\n`;
+          });
+        }
+        md += `</details>\n\n`;
+      }
+    }
+  };
 
-  for (const fileTitle of fileOrder) {
-    md += `### 📄 ${displayFile(fileTitle)}\n\n`;
-    let lastDescribe = null;
-    const inFile = [...byFile.get(fileTitle)].sort(
-      (a, b) => Number(isFailure(b)) - Number(isFailure(a)),
-    );
-    for (const test of inFile) {
-      const describe = stripTags(test.describePath ?? "");
-      if (describe && describe !== lastDescribe) {
-        md += `**${describe}**\n\n`;
-        lastDescribe = describe;
-      }
-      const media = test.media ?? { screenshots: [], gifs: [] };
-      const tags = [...new Set(test.title.match(/@[\w-]+/g) ?? [])];
-      const tagBadges = tags.map((t) => `<code>${t}</code>`).join(" ");
-      const descLine = test.description ? `<br>📝 ${test.description}` : "";
-      md += `<details${isFailure(test) ? " open" : ""}><summary>${icon[test.status] ?? "❔"} <b>${stripTags(test.leaf ?? test.title)}</b> ${tagBadges} <em>(${(test.durationMs / 1000).toFixed(1)}s)</em>${descLine}</summary>\n\n`;
-      if (media.screenshots.length === 0 && media.gifs.length === 0) {
-        md += `_このテストのメディアはありません_\n`;
-      }
-      for (const gif of media.gifs) {
-        md += `#### 📹 実行の録画\n\n![録画](${blobBase}/${toRepoPath(gif)}?raw=true)\n\n`;
-      }
-      if (media.screenshots.length > 0) {
-        md += `#### 🖼️ 画面の遷移(操作順)\n\n`;
-        media.screenshots.forEach(({ file: shot, label }, i) => {
-          md += `**Step ${i + 1}: ${label}**\n\n![${label}](${blobBase}/${toRepoPath(shot)}?raw=true)\n\n`;
-        });
-      }
-      md += `</details>\n\n`;
-    }
+  const failedDetailed = detailed.filter(isFailure);
+  const passedDetailed = detailed.filter((t) => !isFailure(t));
+  if (failedDetailed.length > 0) {
+    md += `## ❌ 失敗(${failedDetailed.length})\n\n`;
+    renderTree(failedDetailed);
+  }
+  if (passedDetailed.length > 0) {
+    md += `## ✅ 成功(${passedDetailed.length})\n\n`;
+    renderTree(passedDetailed);
   }
 
   if (collapsed.length > 0) {
