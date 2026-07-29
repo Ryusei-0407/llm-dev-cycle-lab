@@ -81,6 +81,9 @@ function walkSuite(suite, crumbs) {
       )?.description;
       tests.push({
         title: [...crumbs, spec.title].filter(Boolean).join(" › "),
+        fileTitle: crumbs[0],
+        describePath: crumbs.slice(1).filter(Boolean).join(" › "),
+        leaf: spec.title,
         status: test.status ?? result.status,
         durationMs: result.duration ?? 0,
         attachments: (result.attachments ?? []).filter((a) => a.path),
@@ -335,35 +338,66 @@ function buildComment() {
     md += `各テストを開くと、実行全体の録画と、操作段階ごとのスクリーンショットが見られます。\n\n`;
   }
 
-  // 失敗したテストを先頭に(証跡が最も必要なものから)
-  const ordered = [...detailed].sort((a, b) => Number(isFailure(b)) - Number(isFailure(a)));
-  for (const test of ordered) {
-    const media = test.media ?? { screenshots: [], gifs: [] };
-    const tags = [...new Set(test.title.match(/@[\w-]+/g) ?? [])];
-    const tagBadges = tags.map((t) => `<code>${t}</code>`).join(" ");
-    md += `<details${isFailure(test) ? " open" : ""}><summary>${icon[test.status] ?? "❔"} <b>${cleanTitleOf(test)}</b> ${tagBadges} <em>(${(test.durationMs / 1000).toFixed(1)}s)</em></summary>\n\n`;
-    if (test.description) {
-      md += `📝 ${test.description}\n\n`;
+  // ファイル → describe → テスト のツリー表示。失敗を含むファイル・テストを先頭に。
+  const stripTags = (text) => text.replace(/\s*@[\w-]+/g, "").trim();
+  const displayFile = (text) => text.replace(/^(\.\.\/)+/, "");
+  const fileOrder = [];
+  const byFile = new Map();
+  for (const test of detailed) {
+    const key = test.fileTitle ?? "(unknown)";
+    if (!byFile.has(key)) {
+      byFile.set(key, []);
+      fileOrder.push(key);
     }
-    if (media.screenshots.length === 0 && media.gifs.length === 0) {
-      md += `_このテストのメディアはありません_\n`;
+    byFile.get(key).push(test);
+  }
+  fileOrder.sort(
+    (a, b) => Number(byFile.get(b).some(isFailure)) - Number(byFile.get(a).some(isFailure)),
+  );
+
+  for (const fileTitle of fileOrder) {
+    md += `### 📄 ${displayFile(fileTitle)}\n\n`;
+    let lastDescribe = null;
+    const inFile = [...byFile.get(fileTitle)].sort(
+      (a, b) => Number(isFailure(b)) - Number(isFailure(a)),
+    );
+    for (const test of inFile) {
+      const describe = stripTags(test.describePath ?? "");
+      if (describe && describe !== lastDescribe) {
+        md += `**${describe}**\n\n`;
+        lastDescribe = describe;
+      }
+      const media = test.media ?? { screenshots: [], gifs: [] };
+      const tags = [...new Set(test.title.match(/@[\w-]+/g) ?? [])];
+      const tagBadges = tags.map((t) => `<code>${t}</code>`).join(" ");
+      const descLine = test.description ? `<br>📝 ${test.description}` : "";
+      md += `<details${isFailure(test) ? " open" : ""}><summary>${icon[test.status] ?? "❔"} <b>${stripTags(test.leaf ?? test.title)}</b> ${tagBadges} <em>(${(test.durationMs / 1000).toFixed(1)}s)</em>${descLine}</summary>\n\n`;
+      if (media.screenshots.length === 0 && media.gifs.length === 0) {
+        md += `_このテストのメディアはありません_\n`;
+      }
+      for (const gif of media.gifs) {
+        md += `#### 📹 実行の録画\n\n![録画](${blobBase}/${toRepoPath(gif)}?raw=true)\n\n`;
+      }
+      if (media.screenshots.length > 0) {
+        md += `#### 🖼️ 画面の遷移(操作順)\n\n`;
+        media.screenshots.forEach(({ file: shot, label }, i) => {
+          md += `**Step ${i + 1}: ${label}**\n\n![${label}](${blobBase}/${toRepoPath(shot)}?raw=true)\n\n`;
+        });
+      }
+      md += `</details>\n\n`;
     }
-    for (const file of media.gifs) {
-      md += `#### 📹 実行の録画\n\n![録画](${blobBase}/${toRepoPath(file)}?raw=true)\n\n`;
-    }
-    if (media.screenshots.length > 0) {
-      md += `#### 🖼️ 画面の遷移(操作順)\n\n`;
-      media.screenshots.forEach(({ file, label }, i) => {
-        md += `**Step ${i + 1}: ${label}**\n\n![${label}](${blobBase}/${toRepoPath(file)}?raw=true)\n\n`;
-      });
-    }
-    md += `</details>\n\n`;
   }
 
   if (collapsed.length > 0) {
     md += `<details><summary>⏩ このPRの変更対象外(${collapsed.length}本、すべて成功)</summary>\n\n`;
+    let lastFile = null;
     for (const test of collapsed) {
-      md += `- ${icon[test.status] ?? "❔"} ${cleanTitleOf(test)}`;
+      const fileTitle = test.fileTitle ?? "(unknown)";
+      if (fileTitle !== lastFile) {
+        md += `- ${displayFile(fileTitle)}\n`;
+        lastFile = fileTitle;
+      }
+      md += `  - ${icon[test.status] ?? "❔"} ${stripTags(test.leaf ?? test.title)}`;
       if (test.description) md += ` — ${test.description}`;
       md += `\n`;
     }
