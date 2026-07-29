@@ -334,3 +334,59 @@ describe("applySchemaAndSeed 冪等性 @feature-tickets", () => {
     },
   );
 });
+
+describe("db guards @feature-tickets", () => {
+  it(
+    "rejects trpc access with 500 db_misconfigured when DATABASE_URL is unset",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "DATABASE_URL 未設定で tickets API にアクセスした際に 500 db_misconfigured を返すガードを検証",
+      },
+    },
+    async () => {
+      const saved = process.env.DATABASE_URL;
+      delete process.env.DATABASE_URL;
+      try {
+        const { createApp } = await import("../src/app.js");
+        const res = await createApp().request("/api/trpc/tickets.list?batch=1&input=%7B%7D");
+        expect(res.status).toBe(500);
+        expect(await res.json()).toEqual({ error: "db_misconfigured" });
+      } finally {
+        process.env.DATABASE_URL = saved;
+      }
+    },
+  );
+
+  it(
+    "enforces schema CHECK constraints as the last line of defence",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "zod を迂回した直接 INSERT でも schema の CHECK 制約(subject長・status・priority)が拒否することを検証",
+      },
+    },
+    async () => {
+      const pool = createPool(databaseUrl());
+      await applySchemaAndSeed(databaseUrl());
+      await expect(
+        pool.query(
+          "INSERT INTO tickets (subject, status, priority, requester_email) VALUES ('', 'open', 'low', 'x@example.com')",
+        ),
+      ).rejects.toThrow(/check constraint/i);
+      await expect(
+        pool.query(
+          "INSERT INTO tickets (subject, status, priority, requester_email) VALUES ('ok', 'bogus', 'low', 'x@example.com')",
+        ),
+      ).rejects.toThrow(/check constraint/i);
+      await expect(
+        pool.query(
+          "INSERT INTO tickets (subject, status, priority, requester_email) VALUES ('ok', 'open', 'urgent', 'x@example.com')",
+        ),
+      ).rejects.toThrow(/check constraint/i);
+      await pool.end();
+    },
+  );
+});
