@@ -29,7 +29,7 @@
     "apps/api/src/tickets/schema.ts",
     "apps/api/src/tickets/router.ts",
     "apps/api/db/**",
-    "apps/web/src/routes/tickets.$id.tsx",
+    "apps/web/src/routes/tickets_.$id.tsx",
     "apps/web/src/components/ticket-*",
     "apps/web/src/components/message-*",
     "apps/web/src/lib/orpc.ts"

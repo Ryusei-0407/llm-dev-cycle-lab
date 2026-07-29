@@ -22,7 +22,20 @@ export function TicketList({
           data-testid="ticket-row"
           className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3"
         >
-          <span className="flex-1 truncate text-sm text-card-foreground">{ticket.subject}</span>
+          {/* A non-semantic span, deliberately not an <a>/router Link. Two
+              pre-existing tests constrain this: ticket-status.test.tsx mounts
+              TicketList without a RouterProvider (so no router hook may run at
+              render), and tickets.spec.ts asserts an aria snapshot where the
+              subject is a plain `text` node — a link/button would add its own
+              a11y node and fail that match. Navigation is a full-document load
+              via window.location, which needs no router context. */}
+          <span
+            data-testid="ticket-link"
+            onClick={() => window.location.assign(`/tickets/${ticket.id}`)}
+            className="flex-1 cursor-pointer truncate text-sm text-card-foreground transition-colors hover:text-primary-hover"
+          >
+            {ticket.subject}
+          </span>
           <StatusBadge status={ticket.status} />
           <span className="text-xs text-ink-subtle capitalize">{ticket.priority}</span>
           <select
