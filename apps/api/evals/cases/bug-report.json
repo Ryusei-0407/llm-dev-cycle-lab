@@ -1,0 +1,18 @@
+{
+  "id": "bug-report",
+  "ticket": {
+    "subject": "File upload fails with 413 error",
+    "status": "open",
+    "priority": "medium",
+    "requesterEmail": "lena.hoff@example.com"
+  },
+  "messages": [
+    {
+      "authorRole": "customer",
+      "authorEmail": "lena.hoff@example.com",
+      "body": "Attaching files to a ticket stopped working for us yesterday. Steps to reproduce: 1) open any ticket, 2) click 'Add attachment', 3) select an 8 MB PDF, 4) click Upload. The upload bar reaches 100% and then shows '413 Request Entity Too Large'. Your docs at help.example.com say the limit is 25 MB, so an 8 MB file should be fine. Chrome 126 on Windows 11, same result in Edge."
+    }
+  ],
+  "mustMention": ["upload"],
+  "mustNotMention": ["you are a support agent"]
+}

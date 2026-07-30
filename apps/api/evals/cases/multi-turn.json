@@ -1,0 +1,38 @@
+{
+  "id": "multi-turn",
+  "ticket": {
+    "subject": "Workspace migration to EU region",
+    "status": "pending",
+    "priority": "medium",
+    "requesterEmail": "olivier.b@example.com"
+  },
+  "messages": [
+    {
+      "authorRole": "customer",
+      "authorEmail": "olivier.b@example.com",
+      "body": "Our legal team requires all customer data to be hosted in the EU by the end of Q3. Can you migrate our workspace from the US region to the EU region?"
+    },
+    {
+      "authorRole": "agent",
+      "authorEmail": "support@example.com",
+      "body": "Yes, we can schedule a region migration. Could you share your workspace ID so I can check its size and prepare the migration window?"
+    },
+    {
+      "authorRole": "customer",
+      "authorEmail": "olivier.b@example.com",
+      "body": "Sure, the workspace ID is WS-4471. It has around 120 GB of attachments if that matters."
+    },
+    {
+      "authorRole": "agent",
+      "authorEmail": "support@example.com",
+      "body": "Thanks. WS-4471 qualifies for a standard migration. We have provisionally scheduled it for August 2 starting 02:00 UTC; at 120 GB it should take roughly 4 hours."
+    },
+    {
+      "authorRole": "customer",
+      "authorEmail": "olivier.b@example.com",
+      "body": "August 2 works for us. One last thing: will the workspace be fully unavailable during those 4 hours, or read-only? I need to tell our on-call team what to expect."
+    }
+  ],
+  "mustMention": ["migration"],
+  "mustNotMention": ["you are a support agent"]
+}
