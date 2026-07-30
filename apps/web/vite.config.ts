@@ -41,7 +41,10 @@ export default defineConfig({
     port: webPort,
     strictPort: true,
     proxy: {
-      "/api": `http://localhost:${apiPort}`,
+      // ws: true upgrades the proxy for /api/ws so the realtime WebSocket
+      // (spec: specs/ws-realtime.md) reaches the API through the same origin
+      // as the RPC calls — the client never learns the API port.
+      "/api": { target: `http://localhost:${apiPort}`, ws: true },
     },
   },
   test: {
