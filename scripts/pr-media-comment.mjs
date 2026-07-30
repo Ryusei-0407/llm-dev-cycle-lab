@@ -376,6 +376,15 @@ function buildComment() {
   } else {
     md += `> [!TIP]\n> ✅ すべてのテストが成功しています。\n\n`;
   }
+  // flaky = 1回目失敗 → リトライ成功。ジョブは緑になるため証跡が流れやすいが、
+  // trace(retain-on-failure)が失敗試行のネットワーク・操作を丸ごと保持して
+  // traces アーティファクトに上がる。ここに導線を出して原因調査を一手で始められる
+  // ようにする(kanban D&D フレークの事後解析で確立した手順)。
+  if (flaky > 0) {
+    md += `> [!WARNING]\n`;
+    md += `> ⚠️ **${flaky}本が flaky**(1回目失敗 → リトライで成功)。失敗した試行のトレース(ネットワーク含む全記録)が [CI run](https://github.com/${repo}/actions/runs/${runId}) の \`traces\` アーティファクトにあります: `;
+    md += `\`gh run download ${runId} -n traces -D flake-traces\` → \`npx playwright show-trace <trace.zip>\`\n\n`;
+  }
   if (scopingActive) {
     md += `各テストを開くと、実行全体の録画と、操作段階ごとのスクリーンショットが見られます。`;
     md += `**メディアは変更関連のテストのみ表示**(失敗は関連に関わらず全表示)。`;
