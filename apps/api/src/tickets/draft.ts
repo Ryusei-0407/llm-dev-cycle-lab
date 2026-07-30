@@ -178,7 +178,7 @@ function selectDraftStream(
 // Dependencies the route needs, injected from app.ts so the route stays free of
 // the pool/session wiring (parallels how the oRPC context is injected there).
 export type DraftDeps = {
-  resolveUser: (c: Context) => User | null;
+  resolveUser: (c: Context) => Promise<User | null>;
   ticketStore: () => TicketStore;
   messageStore: () => MessageStore;
 };
@@ -189,8 +189,11 @@ export function createDraftRouter(deps: DraftDeps) {
   router.post("/draft", async (c) => {
     // Auth first: no session → 401, never start a stream (mirrors resolveUser
     // usage in the oRPC context injection; distinct from a bad body).
-    const user = deps.resolveUser(c);
+    const user = await deps.resolveUser(c);
     if (!user) return c.json({ error: "unauthenticated" }, 401);
+    // draft is an agent-only tool (specs/authz.md): a customer is 403 forbidden,
+    // never starts a stream.
+    if (user.role !== "agent") return c.json({ error: "forbidden" }, 403);
 
     let body: unknown;
     try {

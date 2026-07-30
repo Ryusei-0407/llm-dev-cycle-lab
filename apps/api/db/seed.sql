@@ -1,3 +1,14 @@
+-- Deterministic auth seed (spec: specs/auth-db.md). Fixed v7 id literals so the
+-- session lane's foreign keys and the HTTP tests' user shapes are stable.
+-- password_hash is node:crypto scryptSync(password, salt, 64) rendered as
+-- "salt:hexhash"; the plaintexts (agent-pass / customer-pass) are what
+-- verifyCredentials accepts, asserted by auth-route.test.ts and auth-db.test.ts.
+-- salt is the fixed 'llmlab-auth-v1' string, so the hashes below are
+-- reproducible: scryptSync('agent-pass', 'llmlab-auth-v1', 64).toString('hex').
+INSERT INTO users (id, email, name, role, password_hash) VALUES
+  ('00000000-0000-7000-8000-0000000000a1', 'agent@example.com',    'Aki Agent',     'agent',    'llmlab-auth-v1:89dfcf4cd69f610a807f88489444236fa812e491190d94f50f7a48beb66982dc239694e820c5758eb3ae90dfb68b6495fdc1a349dc68b70da55986aa0eae0bc7'),
+  ('00000000-0000-7000-8000-0000000000a2', 'customer@example.com', 'Chika Customer', 'customer', 'llmlab-auth-v1:a7f22e0d3511bef9b6b005331864e2d6dca0f8ab108c6147a2ef0b3608826bd2f16f7efcd74442613b1cc6a2e8b4c92d8d9ccfcef66eda3299d726550f5eb5b4');
+
 -- Deterministic seed (spec: specs/tickets.md values). ids are fixed UUID v7
 -- literals (version nibble '7', variant '8') and created_at is fixed ascending
 -- so list() (created_at DESC, id DESC) is stable: "Feature request" first,

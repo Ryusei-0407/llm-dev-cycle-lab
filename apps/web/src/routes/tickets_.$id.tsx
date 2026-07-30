@@ -9,6 +9,7 @@ import { MessageThread } from "@/components/message-thread";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { orpc } from "@/lib/orpc";
+import { useSessionUser } from "@/lib/session";
 
 // Auth guard mirrors /tickets: resolve the session in beforeLoad and redirect
 // unauthenticated visitors before any detail UI mounts (specs/auth.md).
@@ -32,20 +33,21 @@ function TicketDetailRoute() {
   );
 }
 
-// A NOT_FOUND from tickets.get means the id doesn't resolve to a ticket — render
-// the dedicated not-found panel rather than a generic error. Any other error
-// (e.g. transport) is rare enough to fold into the same panel; the spec's only
-// handled get failure is the missing ticket.
-function isNotFound(error: unknown): boolean {
-  // ORPCError overrides Symbol.hasInstance so instanceof holds across the
-  // client's separate dependency graph. A non-oRPC error (rare) folds into the
-  // same panel — the spec's only handled get failure is the missing ticket.
-  return error instanceof ORPCError ? error.code === "NOT_FOUND" : true;
+// A FORBIDDEN from tickets.get means a customer reached someone else's ticket
+// (specs/authz.md ownership check) — the dedicated forbidden panel, distinct
+// from not-found. ORPCError overrides Symbol.hasInstance so instanceof holds
+// across the client's separate dependency graph.
+function isForbidden(error: unknown): boolean {
+  return error instanceof ORPCError && error.code === "FORBIDDEN";
 }
 
 function TicketDetailPage() {
   const { id } = Route.useParams();
   const queryClient = useQueryClient();
+  // Generate draft is an agent-only tool (specs/customer-portal.md, and the
+  // draft route is 403 for customers per specs/authz.md). Gate on role rather
+  // than relying on the panel happening to be absent.
+  const isAgent = useSessionUser()?.role === "agent";
 
   const detailQuery = useQuery({
     ...orpc.tickets.get.queryOptions({ input: { id } }),
@@ -84,17 +86,21 @@ function TicketDetailPage() {
   if (detailQuery.isError) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 p-4">
-        {isNotFound(detailQuery.error) ? (
+        {isForbidden(detailQuery.error) ? (
+          <p
+            data-testid="ticket-forbidden"
+            role="alert"
+            className="rounded-lg border border-hairline bg-surface-1 p-4 text-sm text-ink-muted"
+          >
+            You do not have access to this ticket.
+          </p>
+        ) : (
           <p
             data-testid="ticket-not-found"
             role="alert"
             className="rounded-lg border border-hairline bg-surface-1 p-4 text-sm text-ink-muted"
           >
             This ticket could not be found.
-          </p>
-        ) : (
-          <p role="alert" className="text-sm text-destructive">
-            Failed to load ticket.
           </p>
         )}
       </main>
@@ -117,15 +123,17 @@ function TicketDetailPage() {
 
       <MessageThread messages={messages} />
 
-      <DraftPanel
-        ticketId={id}
-        onUseDraft={(text) => {
-          // Use draft overwrites the current reply (spec: 既存入力は上書き) and
-          // clears any stale empty-reply error.
-          setBody(text);
-          setReplyError(null);
-        }}
-      />
+      {isAgent && (
+        <DraftPanel
+          ticketId={id}
+          onUseDraft={(text) => {
+            // Use draft overwrites the current reply (spec: 既存入力は上書き) and
+            // clears any stale empty-reply error.
+            setBody(text);
+            setReplyError(null);
+          }}
+        />
+      )}
 
       <form
         onSubmit={onSubmit}

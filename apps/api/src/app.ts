@@ -3,6 +3,7 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { createAuthRouter } from "./auth/routes.js";
+import { createPool } from "./db.js";
 import { GeminiProvider } from "./llm/gemini.js";
 import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
@@ -29,10 +30,14 @@ export function createApp() {
 
   app.get("/api/health", (c) => c.json({ ok: true }));
 
-  // Session store lives for the life of this app instance (in-memory), so all
-  // /api/auth/* requests against one createApp() share it. resolveUser reads the
-  // same store to inject the session user into the oRPC context below.
-  const { router: authRouter, resolveUser } = createAuthRouter();
+  // Auth is postgres-backed now (spec: specs/auth-db.md): users + sessions live
+  // in the same DB the tickets lane uses (DATABASE_URL). The pool is lazy (no
+  // connection until first query), so a missing DATABASE_URL only bites on an
+  // actual /api/auth/* request, matching the tickets getters. resolveUser reads
+  // the same pool to inject the session user into the oRPC context below.
+  const { router: authRouter, resolveUser } = createAuthRouter(
+    createPool(process.env.DATABASE_URL ?? ""),
+  );
   app.route("/api/auth", authRouter);
 
   // DB config guard: tickets is now postgres-backed, so a missing DATABASE_URL
@@ -53,7 +58,7 @@ export function createApp() {
     // unauthenticated.
     const { matched, response } = await rpcHandler.handle(c.req.raw, {
       prefix: "/api/rpc",
-      context: { user: resolveUser(c) },
+      context: { user: await resolveUser(c) },
     });
     if (matched) return c.newResponse(response.body, response);
     await next();

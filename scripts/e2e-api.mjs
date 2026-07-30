@@ -56,11 +56,14 @@ child.on("exit", (code, signal) => {
   else process.exit(code ?? 0);
 });
 
+// Forward the signal to the api and let it close its pg pools first; the DB
+// container is stopped by the child's own 'exit' handler above. Stopping the
+// container here (before the api is down) drops connections under the api's
+// idle clients and floods teardown with pg errors. If the child never exits,
+// the process.on("exit") hook below is the final backstop.
 for (const sig of ["SIGTERM", "SIGINT"]) {
   process.on(sig, () => {
     child.kill(sig);
-    stopDbSync();
-    process.exit(0);
   });
 }
 

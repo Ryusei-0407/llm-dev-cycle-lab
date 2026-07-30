@@ -4,6 +4,7 @@ import { type FormEvent, useState } from "react";
 import { fetchMe } from "@/auth/api";
 import { TopNav } from "@/auth/TopNav";
 import { TicketList } from "@/components/ticket-list";
+import { useSessionUser } from "@/lib/session";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,10 @@ const PRIORITY_OPTIONS: { value: TicketPriority; label: string }[] = [
 
 function TicketsPage() {
   const queryClient = useQueryClient();
+  // Agent-only status control is hidden for the customer session
+  // (specs/customer-portal.md); the API already scopes the list to the
+  // customer's own tickets, so the rows themselves are unchanged.
+  const isAgent = useSessionUser()?.role === "agent";
 
   // Surface load failures immediately (data-testid="tickets-load-error") instead
   // of sitting through React Query's default retry/backoff.
@@ -137,7 +142,11 @@ function TicketsPage() {
           Failed to load tickets.
         </p>
       ) : (
-        <TicketList tickets={ticketsQuery.data ?? []} onStatusChange={onStatusChange} />
+        <TicketList
+          tickets={ticketsQuery.data ?? []}
+          onStatusChange={onStatusChange}
+          showStatusControl={isAgent}
+        />
       )}
     </main>
   );
