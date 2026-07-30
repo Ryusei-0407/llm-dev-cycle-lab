@@ -6,11 +6,6 @@ name: update-snapshots
 
 on:
   workflow_dispatch:
-  # bootstrap 用の一時トリガー(初回 baseline 生成後に削除する):
-  # workflow_dispatch はワークフローがデフォルトブランチに存在しないと呼べない
-  # ため、導入ブランチ自身の push で初回生成を行う。
-  push:
-    branches: [feat/visual-regression]
 
 permissions:
   contents: write
