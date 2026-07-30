@@ -15,7 +15,10 @@ test.describe("kanban board @feature-kanban", () => {
   // status would race other specs that assert against that seed (アンカー型
   // アサーション規約 = 波及ゼロ). The created ticket starts in "open" and the
   // test moves it to in_progress, then verifies persistence on /tickets.
-  const OWN_SUBJECT = "Kanban smoke: elevator music too loud";
+  // リトライごとに一意な subject にする: 共有DBでは前試行の作成分が残るため、
+  // 固定 subject だとリトライで同名カードが複数になり strict mode violation になる
+  const ownSubject = (testInfo: { testId: string; retry: number }) =>
+    `Kanban smoke ${testInfo.testId} r${testInfo.retry}: elevator music too loud`;
 
   // Creates a ticket over the oRPC wire under the current (agent) session and
   // returns its id. oRPC RPCHandler wire: POST /api/rpc/tickets/create, body
@@ -41,9 +44,10 @@ test.describe("kanban board @feature-kanban", () => {
       },
     },
     async ({ page, request }, testInfo) => {
+      const subject = ownSubject(testInfo);
       let ticketId = "";
       await test.step("create a board-owned ticket over the API", async () => {
-        ticketId = await createTicket(request, OWN_SUBJECT);
+        ticketId = await createTicket(request, subject);
       });
 
       await test.step("open the board as an agent", async () => {
@@ -57,7 +61,7 @@ test.describe("kanban board @feature-kanban", () => {
       const ownCard = page
         .getByTestId("kanban-column-open")
         .getByTestId("kanban-card")
-        .filter({ hasText: OWN_SUBJECT });
+        .filter({ hasText: subject });
       const targetColumn = page.getByTestId("kanban-column-in_progress");
 
       await test.step("the created ticket starts in the Open column", async () => {
@@ -67,12 +71,12 @@ test.describe("kanban board @feature-kanban", () => {
 
       await test.step("drag the card into the In progress column", async () => {
         await page.dragAndDrop(
-          `[data-testid="kanban-column-open"] [data-testid="kanban-card"]:has-text("${OWN_SUBJECT}")`,
+          `[data-testid="kanban-column-open"] [data-testid="kanban-card"]:has-text("${subject}")`,
           `[data-testid="kanban-column-in_progress"]`,
         );
         // 列移動が確定する: 対象カードが in_progress 列に現れ、open 列からは消える。
         await expect(
-          targetColumn.getByTestId("kanban-card").filter({ hasText: OWN_SUBJECT }),
+          targetColumn.getByTestId("kanban-card").filter({ hasText: subject }),
         ).toBeVisible();
         await expect(ownCard).toHaveCount(0);
         await expect(page.getByTestId("board-error")).toBeHidden();
@@ -109,7 +113,7 @@ test.describe("kanban board @feature-kanban", () => {
       },
     },
     async ({ page, request }, testInfo) => {
-      const subject = "Kanban failure: coffee machine offline";
+      const subject = `Kanban failure ${testInfo.testId} r${testInfo.retry}: coffee machine offline`;
       await test.step("create a board-owned ticket over the API", async () => {
         await createTicket(request, subject);
       });
