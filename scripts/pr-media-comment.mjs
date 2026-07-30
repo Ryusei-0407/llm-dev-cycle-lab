@@ -283,6 +283,9 @@ for (const test of tests) {
   const screenshots = test.attachments.filter(
     (a) => a.name === "screenshot" || a.name.startsWith("stage: "),
   );
+  // VRT の成果物スクリーンショット(visual spec が成功時に添付する)。録画は
+  // VRT では撮らない方針なので、これが visual テストの表示メディアになる。
+  const shotAttachments = test.attachments.filter((a) => a.name.startsWith("shot: "));
   const videos = test.attachments.filter((a) => a.name === "video");
   // toHaveScreenshot の失敗添付(<shot>-expected/-actual/-diff.png)を3枚組に
   // まとめる。VRT の差分を「期待/実際/差分」で並べて見せる一次データ。
@@ -293,8 +296,21 @@ for (const test of tests) {
     if (!visualTriplets.has(m[1])) visualTriplets.set(m[1], {});
     visualTriplets.get(m[1])[m[2]] = a;
   }
-  if (screenshots.length === 0 && videos.length === 0 && visualTriplets.size === 0) continue;
+  if (
+    screenshots.length === 0 &&
+    videos.length === 0 &&
+    visualTriplets.size === 0 &&
+    shotAttachments.length === 0
+  )
+    continue;
   mkdirSync(dir, { recursive: true });
+  test.media.shots = [];
+  for (const a of shotAttachments) {
+    const label = a.name.slice("shot: ".length);
+    const file = path.join(dir, `shot-${slug(label)}.png`);
+    cpSync(a.path, file);
+    test.media.shots.push({ file, label });
+  }
   for (const [shot, parts] of visualTriplets) {
     const visual = { label: shot };
     for (const kind of ["expected", "actual", "diff"]) {
@@ -510,9 +526,13 @@ function buildComment() {
         if (
           media.screenshots.length === 0 &&
           media.gifs.length === 0 &&
-          (media.visuals ?? []).length === 0
+          (media.visuals ?? []).length === 0 &&
+          (media.shots ?? []).length === 0
         ) {
           md += `_このテストのメディアはありません_\n`;
+        }
+        for (const shot of media.shots ?? []) {
+          md += `#### 🖼️ スクリーンショット: ${shot.label}\n\n![${shot.label}](${blobBase}/${toRepoPath(shot.file)}?raw=true)\n\n`;
         }
         for (const gif of media.gifs) {
           md += `#### 📹 実行の録画\n\n![録画](${blobBase}/${toRepoPath(gif)}?raw=true)\n\n`;

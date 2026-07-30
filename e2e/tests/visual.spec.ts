@@ -15,6 +15,11 @@ import type { Page } from "@playwright/test";
 // - baseline 更新(意図した UI 変更時): 対象ブランチで
 //   `gh workflow run update-snapshots.yml --ref <branch>` → 再生成コミットが
 //   ブランチに積まれ、PR の Files タブで新旧画像の比較ができる
+// VRT は静的な見た目の検証なので録画はノイズ(かつ CI 時間の無駄)。成果物は
+// スクリーンショット — 成功時も撮影画像を添付して PR コメントに出す。
+// (video は worker スコープのオプションなのでファイルのトップレベルに置く)
+test.use({ video: "off" });
+
 test.describe("visual regression @feature-visual @visual", () => {
   const TICKETS = [
     {
@@ -74,6 +79,16 @@ test.describe("visual regression @feature-visual @visual", () => {
     );
   }
 
+  // 成功時の成果物: 比較に使ったのと同条件で撮った現画面を添付する。
+  // PR コメントはこれを「スクリーンショット」として表示する(録画は撮らない)。
+  // body 添付は JSON レポート上で path を持たず、メディア収集(path 前提)から
+  // 漏れる — 出力ディレクトリに保存して path で添付する。
+  async function attachShot(page: Page, name: string) {
+    const file = test.info().outputPath(`shot-${name}.png`);
+    await page.screenshot({ path: file, fullPage: true });
+    await test.info().attach(`shot: ${name}`, { path: file, contentType: "image/png" });
+  }
+
   test.beforeEach(async ({ page }) => {
     // 撮影中の WS 無効化→再フェッチを止める(kanban.spec.ts と同じ隔離)。
     await page.routeWebSocket(/\/api\/ws$/, () => {});
@@ -95,6 +110,7 @@ test.describe("visual regression @feature-visual @visual", () => {
           await page.goto("/login");
           await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
           await expect(page).toHaveScreenshot("login.png", { fullPage: true });
+          await attachShot(page, "login");
         });
       },
     );
@@ -114,6 +130,7 @@ test.describe("visual regression @feature-visual @visual", () => {
         await page.goto("/tickets");
         await expect(page.getByTestId("ticket-row")).toHaveCount(3);
         await expect(page).toHaveScreenshot("tickets.png", { fullPage: true });
+        await attachShot(page, "tickets");
       });
     },
   );
@@ -132,6 +149,7 @@ test.describe("visual regression @feature-visual @visual", () => {
         await page.goto(`/tickets/${TICKETS[0].id}`);
         await expect(page.getByTestId("ticket-subject")).toContainText("Cannot sign in from SSO");
         await expect(page).toHaveScreenshot("ticket-detail.png", { fullPage: true });
+        await attachShot(page, "ticket-detail");
       });
     },
   );
@@ -150,6 +168,7 @@ test.describe("visual regression @feature-visual @visual", () => {
         await page.goto("/board");
         await expect(page.getByTestId("kanban-column-open")).toBeVisible();
         await expect(page).toHaveScreenshot("board.png", { fullPage: true });
+        await attachShot(page, "board");
       });
     },
   );
