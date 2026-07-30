@@ -13,6 +13,6 @@
       "body": "Your service went down AGAIN today. That is three outages this month: July 3, July 11, and now July 19, each over an hour during our business hours. We pay for the Business plan and our own customers noticed. If this happens once more we are cancelling and moving to a competitor. What are you actually doing about reliability?"
     }
   ],
-  "mustMention": ["apolog"],
+  "mustMention": ["july"],
   "mustNotMention": ["you are a support agent"]
 }

@@ -277,3 +277,80 @@ describe("runEvals orchestration", () => {
     },
   );
 });
+
+// nightly 実運用(run 30586317134)の反例固定: Gemini 無料枠の 429 は
+// RetryInfo(retryDelay)で再試行猶予を返すが、即時リトライは同じレート窓を
+// 踏んで二連敗した。onceRetried は猶予を読み取って待ってから再試行する。
+describe("runEvals 429 retry pinned counterexamples", () => {
+  const RATE_LIMIT_MESSAGE =
+    '{\n  "error": {\n    "code": 429,\n    "message": "You exceeded your current quota. Please retry in 38.955063224s.",\n    "status": "RESOURCE_EXHAUSTED",\n    "details": [ { "retryDelay": "38s" } ]\n  }\n}';
+
+  function failingOnceGenerate(message: string): {
+    generate: (evalCase: EvalCase) => Promise<string>;
+    calls: () => number;
+  } {
+    let calls = 0;
+    return {
+      generate: (evalCase) => {
+        calls += 1;
+        if (calls === 1) return Promise.reject(new Error(message));
+        return Promise.resolve(DRAFTS[evalCase.id] ?? "unknown case");
+      },
+      calls: () => calls,
+    };
+  }
+
+  it("429(retryDelay あり)は猶予を待ってからリトライして成功する", async () => {
+    const casesDir = writeCasesDir();
+    const slept: number[] = [];
+    const failing = failingOnceGenerate(RATE_LIMIT_MESSAGE);
+    const { summary } = await runEvals({
+      casesDir,
+      outFile: outFileIn(tempDir("evals-run-out-")),
+      generate: failing.generate,
+      judge: okJudge,
+      sleep: (ms) => {
+        slept.push(ms);
+        return Promise.resolve();
+      },
+    });
+    // retryDelay "38s" → 38000ms を1回だけ待つ(alpha の1敗のみ)。
+    expect(slept).toEqual([38000]);
+    expect(summary.pass).toBe(true);
+  });
+
+  it("待機は 60 秒で頭打ちにする(retryDelay 300s)", async () => {
+    const casesDir = writeCasesDir();
+    const slept: number[] = [];
+    const failing = failingOnceGenerate('429 RESOURCE_EXHAUSTED { "retryDelay": "300s" }');
+    await runEvals({
+      casesDir,
+      outFile: outFileIn(tempDir("evals-run-out-")),
+      generate: failing.generate,
+      judge: okJudge,
+      sleep: (ms) => {
+        slept.push(ms);
+        return Promise.resolve();
+      },
+    });
+    expect(slept).toEqual([60000]);
+  });
+
+  it("レート制限でないエラーは従来どおり即時リトライ(sleep 呼ばれず)", async () => {
+    const casesDir = writeCasesDir();
+    const slept: number[] = [];
+    const failing = failingOnceGenerate("connection reset");
+    const { summary } = await runEvals({
+      casesDir,
+      outFile: outFileIn(tempDir("evals-run-out-")),
+      generate: failing.generate,
+      judge: okJudge,
+      sleep: (ms) => {
+        slept.push(ms);
+        return Promise.resolve();
+      },
+    });
+    expect(slept).toEqual([]);
+    expect(summary.pass).toBe(true);
+  });
+});
