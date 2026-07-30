@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { type DragEvent, useState } from "react";
+import { type DragEvent, useEffect, useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import type { Ticket, TicketStatus } from "@/lib/tickets";
 import { cn } from "@/lib/utils";
@@ -27,18 +27,34 @@ export function KanbanBoard({
   tickets: Ticket[];
   onSetStatus: (id: string, status: TicketStatus) => Promise<void>;
 }) {
-  const [items, setItems] = useState<Ticket[]>(tickets);
   const [error, setError] = useState(false);
+  // Optimistic status overrides keyed by ticket id. A drop commits after
+  // onSetStatus resolves and must not be reverted by a list refetch that raced
+  // ahead of the write: the board's list query is invalidated by every realtime
+  // ticket event — including changes this board did not make (shared E2E
+  // database / other agents) — so an unrelated event mid-drop can deliver a
+  // pre-move list. Rendering server tickets directly and blindly adopting each
+  // refetch would flicker the moved card back to its old column. The override
+  // is dropped once the server list reflects it (or the ticket is gone).
+  const [pending, setPending] = useState<Map<string, TicketStatus>>(() => new Map());
 
-  // Adopt the latest tickets when the source list changes (e.g. the query
-  // resolves from [] to the loaded rows, or refetches after a committed move).
-  // The board still owns column membership between renders so a successful drop
-  // moves a card locally without waiting for a refetch (BM test の本命).
-  const [seen, setSeen] = useState(tickets);
-  if (seen !== tickets) {
-    setSeen(tickets);
-    setItems(tickets);
-  }
+  useEffect(() => {
+    setPending((prev) => {
+      if (prev.size === 0) return prev;
+      const serverStatus = new Map(tickets.map((t) => [t.id, t.status]));
+      const next = new Map(prev);
+      for (const [id, status] of prev) {
+        const current = serverStatus.get(id);
+        if (current === undefined || current === status) next.delete(id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [tickets]);
+
+  const items = tickets.map((t) => {
+    const override = pending.get(t.id);
+    return override && override !== t.status ? { ...t, status: override } : t;
+  });
 
   const onDrop = async (event: DragEvent, status: TicketStatus) => {
     event.preventDefault();
@@ -50,7 +66,7 @@ export function KanbanBoard({
     try {
       await onSetStatus(id, status);
       setError(false);
-      setItems((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
+      setPending((prev) => new Map(prev).set(id, status));
     } catch {
       setError(true);
     }

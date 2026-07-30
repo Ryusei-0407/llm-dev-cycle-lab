@@ -7,6 +7,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
+import { useState } from "react";
 import { expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
 import { KanbanBoard } from "@/components/kanban-board";
@@ -180,6 +181,64 @@ test(
     ).toHaveLength(0);
     await expect.element(open.getByTestId("column-count")).toHaveTextContent("1");
     await expect.element(inProgress.getByTestId("column-count")).toHaveTextContent("2");
+  },
+);
+
+test(
+  "keeps an optimistically moved card in place when a stale list refetch arrives",
+  {
+    annotation: {
+      type: "description",
+      description:
+        "ドロップ成功で列移動を確定した後、その移動をまだ反映していない list の再フェッチ(共有DB+WS無効化で他要因の再取得が割り込む)が届いても、カードが元の列へ巻き戻らないことを検証。共有DB E2E での kanban フレークの根本原因を最下層で固定する",
+    },
+  },
+  async () => {
+    // Harness drives the `tickets` prop from state so the test can inject a
+    // refetch that raced ahead of the write: a new array reference still
+    // carrying t1 in "open" (the pre-move list). This is exactly what the
+    // board's realtime-invalidated list query delivers when an unrelated
+    // ticket event fires mid-drop under the shared E2E database.
+    function Harness() {
+      const [tickets, setTickets] = useState<Ticket[]>(seed);
+      return (
+        <>
+          <button
+            type="button"
+            data-testid="__inject-stale-refetch"
+            onClick={() => setTickets(seed.map((t) => ({ ...t })))}
+          >
+            refetch
+          </button>
+          <KanbanBoard tickets={tickets} onSetStatus={async () => {}} />
+        </>
+      );
+    }
+    await renderInRouter(<Harness />);
+
+    const open = page.getByTestId("kanban-column-open");
+    const inProgress = page.getByTestId("kanban-column-in_progress");
+    const card = open.getByTestId("kanban-card").filter({ hasText: "Cannot login to dashboard" });
+
+    await dragCardTo(card.element(), inProgress.element());
+    await expect
+      .element(
+        inProgress.getByTestId("kanban-card").filter({ hasText: "Cannot login to dashboard" }),
+      )
+      .toBeVisible();
+
+    // 古い状態(移動前)の list 再フェッチが割り込む。
+    await page.getByTestId("__inject-stale-refetch").click();
+
+    // 巻き戻らない: カードは in_progress に留まり、open には戻らない。
+    await expect
+      .element(
+        inProgress.getByTestId("kanban-card").filter({ hasText: "Cannot login to dashboard" }),
+      )
+      .toBeVisible();
+    await expect(
+      open.getByTestId("kanban-card").filter({ hasText: "Cannot login to dashboard" }).elements(),
+    ).toHaveLength(0);
   },
 );
 

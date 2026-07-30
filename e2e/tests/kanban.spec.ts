@@ -34,6 +34,24 @@ test.describe("kanban board @feature-kanban", () => {
     return id!;
   }
 
+  // Isolate the board from realtime churn. The board is agent-wide, so it lists
+  // EVERY ticket in the shared E2E database and its list query is invalidated by
+  // every realtime ticket event — including creates from other specs running in
+  // parallel. Each such event refetches and re-orders the columns (newest first),
+  // shifting cards under the pointer; page.dragAndDrop resolves the source, then
+  // a re-order between its hover and mousedown makes it grab a neighbouring card
+  // — occasionally another spec's ticket, which then gets moved. That is the
+  // kanban D&D flake. These tests verify drag→setStatus→persist, not realtime
+  // (ws-realtime.spec covers that), so mock the socket to deliver no events and
+  // keep the board still for the duration of the drag. The app treats the socket
+  // as a progressive enhancement, so a silent socket changes nothing else.
+  test.beforeEach(async ({ page }) => {
+    await page.routeWebSocket(/\/api\/ws$/, () => {
+      // Intercept without connectToServer(): the board's socket "opens" against
+      // this mock and simply never receives an invalidation event.
+    });
+  });
+
   test(
     "drags a ticket from Open to In progress and the new status persists @smoke",
     {
