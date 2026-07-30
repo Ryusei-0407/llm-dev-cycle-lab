@@ -139,27 +139,42 @@ const featureMatchers = new Map(
   Object.entries(featureMap).map(([name, globs]) => [name, globs.map(globToRegExp)]),
 );
 
-function getChangedFiles() {
+// Returns the PR's changed files with their git status, or null when the set is
+// unknown (dry-run without injection). Dry-run injection accepts "path" (treated
+// as modified) or "path:added" to exercise the new-vs-existing split.
+function getChangedEntries() {
   if (changedFilesArg !== undefined) {
     return changedFilesArg
       .split(",")
-      .map((f) => f.trim())
-      .filter(Boolean);
+      .map((raw) => raw.trim())
+      .filter(Boolean)
+      .map((raw) => {
+        const [filename, status] = raw.split(":");
+        return { filename: filename.trim(), status: (status ?? "modified").trim() };
+      });
   }
-  if (DRY_RUN) return null; // unknown changed set in dry-run without injection
+  if (DRY_RUN) return null;
+  // {filename,status} per line — safe across --paginate pages, and avoids the
+  // multi-line `patch` field that would break line-based parsing.
   return sh("gh", [
     "api",
     `repos/${repo}/pulls/${prNumber}/files`,
     "--paginate",
     "--jq",
-    ".[].filename",
+    ".[] | {filename, status} | @json",
   ])
     .split("\n")
-    .map((f) => f.trim())
-    .filter(Boolean);
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
 }
 
-const changedFiles = getChangedFiles();
+const changedEntries = getChangedEntries();
+const changedFiles = changedEntries?.map((e) => e.filename) ?? null;
+// Spec files added (not modified) in this PR — their tests are new implementations.
+const addedFiles = new Set(
+  (changedEntries ?? []).filter((e) => e.status === "added").map((e) => e.filename),
+);
 // null = we could not determine the changed set (dry-run without injection).
 // Then scoping cannot apply, so every test is treated as related (old behavior).
 const scopingActive = changedFiles !== null;
@@ -169,21 +184,44 @@ function featureOf(test) {
   return test.title.match(/@feature-([\w-]+)/)?.[1];
 }
 
-function isRelated(test) {
-  if (!scopingActive) return true;
-  // (c) failures are always shown in full, regardless of scope.
-  if (test.status === "failed" || test.status === "unexpected") return true;
-  // (b) the test's own spec file was changed.
-  if (test.specFile && changedFiles.includes(test.specFile)) return true;
+// Returns why a test is in scope for this PR: the trigger and the changed
+// file(s) behind it, so shared-file matches (e.g. a schema/entry-point edit
+// pulling in an unrelated feature) are transparent rather than mysterious.
+function relationOf(test) {
+  if (!scopingActive) return { related: true, reason: null, files: [] };
+  if (test.status === "failed" || test.status === "unexpected") {
+    return { related: true, reason: "失敗", files: [] };
+  }
+  if (test.specFile && changedFiles.includes(test.specFile)) {
+    const added = addedFiles.has(test.specFile);
+    return {
+      related: true,
+      reason: added ? "新規追加" : "テスト自体を変更",
+      files: [test.specFile],
+    };
+  }
   const feature = featureOf(test);
-  if (!feature) return false;
-  // (a) a feature-map glob matched, or the feature's spec doc changed.
-  if (changedFiles.includes(`specs/${feature}.md`)) return true;
+  if (!feature) return { related: false, reason: null, files: [] };
+  if (changedFiles.includes(`specs/${feature}.md`)) {
+    return { related: true, reason: "仕様書を変更", files: [`specs/${feature}.md`] };
+  }
   const matchers = featureMatchers.get(feature) ?? [];
-  return changedFiles.some((f) => matchers.some((re) => re.test(f)));
+  const files = changedFiles.filter((f) => matchers.some((re) => re.test(f)));
+  return files.length > 0
+    ? { related: true, reason: "関連ファイルを変更", files }
+    : { related: false, reason: null, files: [] };
 }
 
-for (const test of tests) test.related = isRelated(test);
+for (const test of tests) {
+  const rel = relationOf(test);
+  test.related = rel.related;
+  test.relationReason = rel.reason;
+  test.relationFiles = rel.files;
+  // New = the test's spec file was added in this PR (the common shape of a new
+  // feature: a fresh spec file). Tests added into an existing file fall under
+  // "existing (related)" — acceptable, the file is already shown.
+  test.isNew = Boolean(test.specFile && addedFiles.has(test.specFile));
+}
 // Unrelated passing (non-flaky) tests are listed by name only — no media.
 const wantsMedia = (test) =>
   test.related ||
@@ -340,7 +378,8 @@ function buildComment() {
   }
   if (scopingActive) {
     md += `各テストを開くと、実行全体の録画と、操作段階ごとのスクリーンショットが見られます。`;
-    md += `**メディアは変更関連のテストのみ表示**(失敗は関連に関わらず全表示)。\n\n`;
+    md += `**メディアは変更関連のテストのみ表示**(失敗は関連に関わらず全表示)。`;
+    md += `共有ファイル(APIのエントリやスキーマ等)を変更すると、それを参照する他機能も\`🔍 関連理由\`付きで表示されます。\n\n`;
   } else {
     md += `各テストを開くと、実行全体の録画と、操作段階ごとのスクリーンショットが見られます。\n\n`;
   }
@@ -362,6 +401,13 @@ function buildComment() {
     }
     for (const fileTitle of fileOrder) {
       md += `### 📄 ${displayFile(fileTitle)}\n\n`;
+      // Why this file is in scope: the file(s) whose change pulled it in. Lets
+      // a reader see, e.g., that chat shows only because a shared entry point
+      // (apps/api/src/app.ts) changed, not the chat feature itself.
+      const trigger = byFile.get(fileTitle).find((t) => t.relationReason);
+      if (scopingActive && trigger?.relationReason && trigger.relationFiles.length > 0) {
+        md += `<sub>🔍 ${trigger.relationReason}: ${trigger.relationFiles.map((f) => `\`${f}\``).join(", ")}</sub>\n\n`;
+      }
       let lastDescribe = null;
       for (const test of byFile.get(fileTitle)) {
         const describe = stripTags(test.describePath ?? "");
@@ -403,9 +449,24 @@ function buildComment() {
     md += `## ❌ 失敗(${failedDetailed.length})\n\n`;
     renderTree(failedDetailed);
   }
-  if (passedDetailed.length > 0) {
-    md += `## ✅ 成功(${passedDetailed.length})\n\n`;
-    renderTree(passedDetailed);
+  // Passed related tests split by novelty: newly-implemented (this PR added the
+  // spec file) vs pre-existing (shown because a shared/related file changed).
+  const newPassed = passedDetailed.filter((t) => t.isNew);
+  const existingPassed = passedDetailed.filter((t) => !t.isNew);
+  if (scopingActive && newPassed.length > 0) {
+    md += `## 🆕 このPRで追加された機能のテスト(${newPassed.length})\n\n`;
+    renderTree(newPassed);
+  }
+  if (existingPassed.length > 0) {
+    const title =
+      scopingActive && newPassed.length > 0
+        ? `## ♻️ 既存テスト(このPRの変更に関連・${existingPassed.length})`
+        : `## ✅ 成功(${existingPassed.length})`;
+    md += `${title}\n\n`;
+    if (scopingActive && newPassed.length > 0) {
+      md += `<sub>これらは新機能そのものではなく、変更したファイルが波及するため表示されています(各見出しの 🔍 参照)。</sub>\n\n`;
+    }
+    renderTree(existingPassed);
   }
 
   if (collapsed.length > 0) {
@@ -422,6 +483,17 @@ function buildComment() {
       md += `\n`;
     }
     md += `\n</details>\n\n`;
+  }
+
+  // スコープ表示は「変更関連だけ」を絞り込む。全テストの録画を見たいときの逃げ道:
+  // CI は全テストの動画を毎回記録し playwright-report を artifact 化している
+  // (成功/失敗問わず・14日保持)。ここへ導線を張り、絞り込みで隠れた録画にも
+  // ダウンロード一発で到達できるようにする。
+  if (scopingActive) {
+    const runUrl = `https://github.com/${repo}/actions/runs/${runId}`;
+    md += `> [!NOTE]\n`;
+    md += `> 🎥 **全テストの録画を見たいとき** — このrunの \`playwright-report\` アーティファクトに全テストの動画が入っています(スコープ外も含め全件・14日保持)。`;
+    md += `[run を開く](${runUrl})→ 下部の Artifacts、または \`gh run download ${runId} -n playwright-report -D pw-report && npx playwright show-report pw-report\`。\n\n`;
   }
 
   md += `<sub>画像の保存先: [\`${MEDIA_BRANCH}\` ブランチ](${blobBase}/${destPrefix})(PRごとに直近${KEEP_RUNS_PER_PR}run分を保持) · run [${runId}](https://github.com/${repo}/actions/runs/${runId})</sub>\n`;
