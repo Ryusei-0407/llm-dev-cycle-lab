@@ -2,7 +2,8 @@ import type { Context } from "hono";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
-import { createSessionStore } from "./session.js";
+import type { Pool } from "../db.js";
+import { createDbSessionStore } from "./session.js";
 import { userById, verifyCredentials, type User } from "./users.js";
 
 const SID = "sid";
@@ -13,8 +14,10 @@ type AuthEnv = { Variables: { user: User } };
 // Resolves the session cookie to a user and short-circuits with 401
 // unauthenticated when absent or unknown (distinct from login's
 // invalid_credentials — the client tells the two apart, per specs/auth.md).
-export function createAuthRouter() {
-  const sessions = createSessionStore();
+// pool-backed now (spec: specs/auth-db.md): sessions + users live in postgres,
+// so credential/session lookups are async.
+export function createAuthRouter(pool: Pool) {
+  const sessions = createDbSessionStore(pool);
 
   // sid cookie → session → User, or null when absent/invalid. Shared by
   // requireAuth (Hono middleware) and the oRPC context injection in app.ts so
@@ -22,14 +25,14 @@ export function createAuthRouter() {
   // short-circuit: an absent session is a valid state for the oRPC context
   // (read procedures allow null; create/reply turn it into UNAUTHORIZED
   // themselves). requireAuth below is the enforcing variant.
-  const resolveUser = (c: Context): User | null => {
+  const resolveUser = async (c: Context): Promise<User | null> => {
     const sid = getCookie(c, SID);
-    const userId = sid ? sessions.verify(sid) : null;
-    return userId ? userById(userId) : null;
+    const userId = sid ? await sessions.verify(sid) : null;
+    return userId ? await userById(pool, userId) : null;
   };
 
   const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
-    const user = resolveUser(c);
+    const user = await resolveUser(c);
     if (!user) return c.json({ error: "unauthenticated" }, 401);
     c.set("user", user);
     await next();
@@ -48,19 +51,19 @@ export function createAuthRouter() {
     if (typeof email !== "string" || typeof password !== "string") {
       return c.json({ error: "invalid_credentials" }, 401);
     }
-    const user = verifyCredentials(email, password);
+    const user = await verifyCredentials(pool, email, password);
     if (!user) return c.json({ error: "invalid_credentials" }, 401);
 
-    const sid = sessions.create(user.id);
-    // Secure/Max-Age are out of scope for the tests and the store is in-memory;
-    // httpOnly + sameSite=lax are the guarantees specs/auth.md pins down.
+    const sid = await sessions.create(user.id);
+    // Secure/Max-Age are out of scope for the tests; httpOnly + sameSite=lax are
+    // the guarantees specs/auth.md pins down.
     setCookie(c, SID, sid, { httpOnly: true, sameSite: "Lax", path: "/" });
     return c.json({ user });
   });
 
-  router.post("/logout", (c) => {
+  router.post("/logout", async (c) => {
     const sid = getCookie(c, SID);
-    if (sid) sessions.destroy(sid);
+    if (sid) await sessions.destroy(sid);
     deleteCookie(c, SID, { path: "/" });
     return c.body(null, 204);
   });
