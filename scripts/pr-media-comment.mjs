@@ -485,6 +485,17 @@ function buildComment() {
     md += `\n</details>\n\n`;
   }
 
+  // スコープ表示は「変更関連だけ」を絞り込む。全テストの録画を見たいときの逃げ道:
+  // CI は全テストの動画を毎回記録し playwright-report を artifact 化している
+  // (成功/失敗問わず・14日保持)。ここへ導線を張り、絞り込みで隠れた録画にも
+  // ダウンロード一発で到達できるようにする。
+  if (scopingActive) {
+    const runUrl = `https://github.com/${repo}/actions/runs/${runId}`;
+    md += `> [!NOTE]\n`;
+    md += `> 🎥 **全テストの録画を見たいとき** — このrunの \`playwright-report\` アーティファクトに全テストの動画が入っています(スコープ外も含め全件・14日保持)。`;
+    md += `[run を開く](${runUrl})→ 下部の Artifacts、または \`gh run download ${runId} -n playwright-report -D pw-report && npx playwright show-report pw-report\`。\n\n`;
+  }
+
   md += `<sub>画像の保存先: [\`${MEDIA_BRANCH}\` ブランチ](${blobBase}/${destPrefix})(PRごとに直近${KEEP_RUNS_PER_PR}run分を保持) · run [${runId}](https://github.com/${repo}/actions/runs/${runId})</sub>\n`;
   return md;
 }
