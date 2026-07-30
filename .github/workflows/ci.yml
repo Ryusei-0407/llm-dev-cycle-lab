@@ -171,6 +171,19 @@ jobs:
           name: test-results
           path: e2e/test-results/
           retention-days: 14
+      # Flaky tests (fail once, retry passes) leave the job green, so the
+      # failure() upload above never fires — yet their failing attempts are
+      # exactly what a flake postmortem needs. With trace retain-on-failure,
+      # trace.zip files exist only for failing attempts, so this artifact is
+      # skipped on clean runs and tiny when a flake occurs.
+      - name: Upload flaky-attempt traces
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: traces
+          path: e2e/test-results/**/trace.zip
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Comment summary on PR
         if: ${{ !cancelled() }}

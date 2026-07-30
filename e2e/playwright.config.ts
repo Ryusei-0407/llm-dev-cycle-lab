@@ -38,8 +38,14 @@ export default defineConfig({
   use: {
     baseURL: webBaseURL,
     // PW_TRACE=on is the nightly perf lane: record everything so the
-    // trace-analyst can mine timings. Default stays cheap for the PR lane.
-    trace: process.env.PW_TRACE === "on" ? "on" : "on-first-retry",
+    // trace-analyst can mine timings.
+    // Default is retain-on-failure, NOT on-first-retry: on-first-retry records
+    // only the retry attempt, so a flaky test (fails once, retry passes) leaves
+    // no trace of the attempt that actually failed — the one piece of evidence
+    // a flake postmortem needs (network bodies included; kanban D&D フレークは
+    // このトレース内のネットワーク証跡で原因確定した). retain-on-failure traces
+    // every attempt and keeps only failing ones, so flakes self-evidence in CI.
+    trace: process.env.PW_TRACE === "on" ? "on" : "retain-on-failure",
     // CI records video for every test: the suite is small and the PR media
     // comment (scripts/pr-media-comment.mjs) attaches evidence for passing
     // runs too. Revisit if the suite grows enough to hurt the time budget.
