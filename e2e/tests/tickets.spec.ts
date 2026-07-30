@@ -65,22 +65,24 @@ test.describe("tickets over tRPC @feature-tickets", () => {
   );
 
   test(
-    "shows a validation error and keeps the list unchanged for an empty subject",
+    "shows a validation error and keeps the create form open for an empty subject",
     {
       annotation: {
         type: "description",
         description:
-          "空の件名で作成を試みたときにバリデーションエラーが出て一覧の件数が変わらないことを検証",
+          "空の件名で作成を試みたときにバリデーションエラーが出て、作成フォームが開いたまま(未作成)であることを検証",
       },
     },
     async ({ page }, testInfo) => {
-      // 件数は絶対値でなく前後比較にする: ストアはEEラン全体で共有され、
-      // 他テストの作成分が混ざりうる(実行順・並列度に依存しない検証にする)
-      let before = 0;
+      // 検証は「作成されなかったこと」を一覧の件数で測らない: DBはEEラン全体で
+      // 共有され、他テストの作成/削除やWSライブ更新で行数が前後する。件数を
+      // アンカーにするとフレークになる(空件名フレークの根本原因)。空件名は
+      // クライアント側で mutate 前に弾かれ、成功時のみフォームが閉じる仕様なので、
+      // 「エラー表示 + フォームが開いたまま(件名入力が残る)」= 未作成、という
+      // このテスト自身が所有するUI契約だけを検証する(波及ゼロのアンカー型)。
       await test.step("チケットページを読み込む", async () => {
         await page.goto("/tickets");
         await expect(page.getByTestId("ticket-row").first()).toBeVisible();
-        before = await page.getByTestId("ticket-row").count();
         await snap(page, testInfo, "初期表示");
       });
 
@@ -91,7 +93,8 @@ test.describe("tickets over tRPC @feature-tickets", () => {
 
       await test.step("バリデーションエラー表示を確認する", async () => {
         await expect(page.getByTestId("ticket-error")).toBeVisible();
-        await expect(page.getByTestId("ticket-row")).toHaveCount(before);
+        // 成功時のみフォームは閉じる。開いたまま(件名入力が可視)= 未作成の証左。
+        await expect(page.getByLabel("Subject")).toBeVisible();
         await snap(page, testInfo, "バリデーションエラー");
       });
     },
