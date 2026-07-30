@@ -61,6 +61,7 @@
     "apps/api/src/auth/passkey.ts",
     "apps/web/src/lib/webauthn.ts",
     "apps/web/src/routes/login.tsx",
-    "apps/web/src/auth/TopNav.tsx"
+    "apps/web/src/auth/TopNav.tsx",
+    "e2e/helpers/webauthn.ts"
   ]
 }
