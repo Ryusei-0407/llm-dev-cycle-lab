@@ -1,0 +1,279 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { runEvals } from "../evals/run.js";
+import type { EvalCase, JudgeVerdict } from "../evals/types.js";
+
+// evals (spec: specs/evals.md) MUST 6 & 7: the orchestration exported from
+// run.ts as runEvals(deps). The CLI wrapper stays thin (arg parsing, real
+// generate/judge wiring, process.exit(summary.pass ? 0 : 1)), so the unit layer
+// drives runEvals directly with injected fakes — no network, no real LLM.
+//
+// Injected contract (derived from the spec's seam requirement):
+//   runEvals({ casesDir, outFile, generate, judge })
+//     -> Promise<{ results: CaseResult[]; summary: Summary }>
+//   generate: (evalCase) => Promise<string>  // full draft text (stream joined)
+//   judge:    JudgeFn                        // (evalCase, draft) => JudgeVerdict
+// The report file at outFile holds the same { results, summary } as JSON, and
+// summary.pass is the value the CLI maps onto the exit code.
+
+const createdDirs: string[] = [];
+
+function tempDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  createdDirs.push(dir);
+  return dir;
+}
+
+afterEach(() => {
+  for (const dir of createdDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Two minimal cases; filenames are lexicographic so results come back
+// [alpha, beta]. minChars is explicit and small so short fake drafts pass.
+function writeCasesDir(): string {
+  const dir = tempDir("evals-run-cases-");
+  const base = {
+    ticket: {
+      subject: "Cannot reset my password",
+      status: "open",
+      priority: "high",
+      requesterEmail: "customer@example.com",
+    },
+    messages: [
+      {
+        authorRole: "customer",
+        authorEmail: "customer@example.com",
+        body: "The reset link says 'token expired' right after it arrives.",
+      },
+    ],
+    mustNotMention: ["you are a support agent"],
+    minChars: 20,
+    maxChars: 500,
+  };
+  writeFileSync(
+    join(dir, "alpha.json"),
+    JSON.stringify({ ...base, id: "alpha", mustMention: ["reset"] }),
+  );
+  writeFileSync(
+    join(dir, "beta.json"),
+    JSON.stringify({ ...base, id: "beta", mustMention: ["refund"] }),
+  );
+  return dir;
+}
+
+const DRAFTS: Record<string, string> = {
+  alpha: "Thanks for reaching out. Please try the reset flow once more and tell us the result.",
+  beta: "We have issued the refund to your original payment method. Thanks for your patience.",
+};
+
+function okGenerate(evalCase: EvalCase): Promise<string> {
+  return Promise.resolve(DRAFTS[evalCase.id] ?? "unknown case");
+}
+
+function okJudge(): Promise<JudgeVerdict> {
+  return Promise.resolve({ score: 5, reasoning: "faithful, responsive, polite" });
+}
+
+function outFileIn(dir: string): string {
+  return join(dir, "evals-report.json");
+}
+
+describe("runEvals orchestration", () => {
+  it(
+    "注入した fake 生成/judge で全ケースが CaseResult 化され、report JSON が書かれる",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "fake の生成・judge を注入した runEvals が全ケースを CaseResult 化(checks 3件 + verdict)し、--out 相当のファイルに results + summary の JSON を書き、pass=true を返すことを検証",
+      },
+    },
+    async () => {
+      const casesDir = writeCasesDir();
+      const outFile = outFileIn(tempDir("evals-run-out-"));
+      const { results, summary } = await runEvals({
+        casesDir,
+        outFile,
+        generate: okGenerate,
+        judge: okJudge,
+      });
+
+      expect(results.map((r) => r.id)).toEqual(["alpha", "beta"]);
+      for (const result of results) {
+        expect(result.draft).toBe(DRAFTS[result.id]);
+        expect(result.error).toBeNull();
+        expect(result.checks.map((c) => c.name)).toEqual([
+          "length",
+          "must-mention",
+          "must-not-mention",
+        ]);
+        expect(result.checks.every((c) => c.pass)).toBe(true);
+        expect(result.verdict).toEqual({ score: 5, reasoning: "faithful, responsive, polite" });
+      }
+      expect(summary).toEqual({
+        total: 2,
+        programmaticFailures: 0,
+        rubricPassRate: 1,
+        pass: true,
+      });
+
+      const report = JSON.parse(readFileSync(outFile, "utf8"));
+      expect(report.results.map((r: { id: string }) => r.id)).toEqual(["alpha", "beta"]);
+      expect(report.summary.pass).toBe(true);
+    },
+  );
+
+  it(
+    "judge が閾値割れの score を返すと summary.pass=false(CLI の exit 1 に対応)",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "全ケースの judge score が 3 のとき rubricPassRate=0 で summary.pass=false になり、report にも fail が記録されることを検証(CLI は pass を exit code に写像)",
+      },
+    },
+    async () => {
+      const casesDir = writeCasesDir();
+      const outFile = outFileIn(tempDir("evals-run-out-"));
+      const { summary } = await runEvals({
+        casesDir,
+        outFile,
+        generate: okGenerate,
+        judge: () => Promise.resolve({ score: 3, reasoning: "not directly responsive" }),
+      });
+      expect(summary.rubricPassRate).toBe(0);
+      expect(summary.pass).toBe(false);
+      const report = JSON.parse(readFileSync(outFile, "utf8"));
+      expect(report.summary.pass).toBe(false);
+    },
+  );
+
+  it(
+    "programmatic チェック落ち(mustMention 欠落ドラフト)でも summary.pass=false",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "生成ドラフトが mustMention を満たさないとき programmaticFailures が数えられ summary.pass=false になることを検証",
+      },
+    },
+    async () => {
+      const casesDir = writeCasesDir();
+      const outFile = outFileIn(tempDir("evals-run-out-"));
+      const { results, summary } = await runEvals({
+        casesDir,
+        outFile,
+        // Long enough for minChars but never contains "reset" / "refund".
+        generate: () => Promise.resolve("Thanks for contacting support. We will look into it."),
+        judge: okJudge,
+      });
+      expect(results.every((r) => r.checks.some((c) => !c.pass))).toBe(true);
+      expect(summary.programmaticFailures).toBe(2);
+      expect(summary.pass).toBe(false);
+    },
+  );
+
+  it(
+    "生成 API エラーは 1 回リトライされ、2回目成功なら成功扱い",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "alpha の生成が1回目 reject・2回目 resolve のとき、リトライで CaseResult.error=null のまま成功し、生成呼び出しが2回で止まることを検証",
+      },
+    },
+    async () => {
+      const casesDir = writeCasesDir();
+      const outFile = outFileIn(tempDir("evals-run-out-"));
+      const calls: Record<string, number> = {};
+      const flakyGenerate = (evalCase: EvalCase): Promise<string> => {
+        calls[evalCase.id] = (calls[evalCase.id] ?? 0) + 1;
+        if (evalCase.id === "alpha" && calls.alpha === 1) {
+          return Promise.reject(new Error("503 upstream unavailable"));
+        }
+        return okGenerate(evalCase);
+      };
+      const { results, summary } = await runEvals({
+        casesDir,
+        outFile,
+        generate: flakyGenerate,
+        judge: okJudge,
+      });
+      expect(calls.alpha).toBe(2);
+      expect(calls.beta).toBe(1);
+      const alpha = results.find((r) => r.id === "alpha");
+      expect(alpha?.error).toBeNull();
+      expect(alpha?.draft).toBe(DRAFTS.alpha);
+      expect(summary.pass).toBe(true);
+    },
+  );
+
+  it(
+    "生成が2連続で失敗したケースは CaseResult.error に理由が入り checks=[] / verdict=null",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "alpha の生成が2連続 reject のときリトライは1回で打ち切られ(呼び出し2回)、error に理由・checks 空・verdict null で記録され summary.pass=false になることを検証",
+      },
+    },
+    async () => {
+      const casesDir = writeCasesDir();
+      const outFile = outFileIn(tempDir("evals-run-out-"));
+      const calls: Record<string, number> = {};
+      const failingGenerate = (evalCase: EvalCase): Promise<string> => {
+        calls[evalCase.id] = (calls[evalCase.id] ?? 0) + 1;
+        if (evalCase.id === "alpha") {
+          return Promise.reject(new Error("quota exhausted"));
+        }
+        return okGenerate(evalCase);
+      };
+      const { results, summary } = await runEvals({
+        casesDir,
+        outFile,
+        generate: failingGenerate,
+        judge: okJudge,
+      });
+      expect(calls.alpha).toBe(2); // initial attempt + exactly one retry
+      const alpha = results.find((r) => r.id === "alpha");
+      expect(alpha?.error).toContain("quota exhausted");
+      expect(alpha?.checks).toEqual([]);
+      expect(alpha?.verdict).toBeNull();
+      // The healthy case still completes independently.
+      const beta = results.find((r) => r.id === "beta");
+      expect(beta?.error).toBeNull();
+      expect(summary.pass).toBe(false);
+    },
+  );
+
+  it(
+    "judge 呼び出しが失敗したケースは verdict=null(error は生成失敗専用)で pass=false",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "生成は成功したが judge が reject するとき CaseResult は verdict=null・error=null・checks あり、summary.pass=false になることを検証",
+      },
+    },
+    async () => {
+      const casesDir = writeCasesDir();
+      const outFile = outFileIn(tempDir("evals-run-out-"));
+      const { results, summary } = await runEvals({
+        casesDir,
+        outFile,
+        generate: okGenerate,
+        judge: () => Promise.reject(new Error("judge unavailable")),
+      });
+      for (const result of results) {
+        expect(result.verdict).toBeNull();
+        expect(result.error).toBeNull();
+        expect(result.checks.length).toBe(3);
+      }
+      expect(summary.pass).toBe(false);
+    },
+  );
+});
