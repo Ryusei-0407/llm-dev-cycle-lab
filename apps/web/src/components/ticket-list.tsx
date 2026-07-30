@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { StatusBadge } from "@/components/status-badge";
 import type { Ticket, TicketStatus } from "@/lib/tickets";
 
@@ -22,7 +23,18 @@ export function TicketList({
           data-testid="ticket-row"
           className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3"
         >
-          <span className="flex-1 truncate text-sm text-card-foreground">{ticket.subject}</span>
+          {/* A semantic router Link (renders <a role=link>): keyboard-focusable
+              and it navigates in-app (SPA) rather than a full-document load.
+              Mounting TicketList now requires a router context, so
+              ticket-status.test.tsx wraps it in a memory router. */}
+          <Link
+            data-testid="ticket-link"
+            to="/tickets/$id"
+            params={{ id: ticket.id }}
+            className="flex-1 truncate text-sm text-card-foreground transition-colors hover:text-primary-hover"
+          >
+            {ticket.subject}
+          </Link>
           <StatusBadge status={ticket.status} />
           <span className="text-xs text-ink-subtle capitalize">{ticket.priority}</span>
           <select

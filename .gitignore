@@ -20,3 +20,4 @@ apps/web/test-browser/__screenshots__/
 *.log
 worklog.md
 .DS_Store
+.vitest-attachments/

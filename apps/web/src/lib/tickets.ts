@@ -12,3 +12,14 @@ export type Ticket = {
   requesterEmail: string;
   createdAt: string;
 };
+
+export type MessageRole = "customer" | "agent";
+
+export type Message = {
+  id: string;
+  ticketId: string;
+  authorEmail: string;
+  authorRole: MessageRole;
+  body: string;
+  createdAt: string;
+};

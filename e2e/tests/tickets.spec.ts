@@ -36,18 +36,19 @@ test.describe("tickets over tRPC @feature-tickets", () => {
         await snap(page, testInfo, "作成後");
       });
 
-      // Structural assertion: roles and order only. The first row is the
-      // just-created ticket; the three seeds follow.
+      // Structural assertion: roles and order only. Each subject is a router
+      // Link, so it surfaces as a `link` node inside its listitem. The first
+      // row is the just-created ticket; the three seeds follow.
       await expect(page.getByTestId("ticket-list")).toMatchAriaSnapshot(`
       - list:
         - listitem:
-          - text: /Printer on fire/
+          - link /Printer on fire/
         - listitem:
-          - text: /Feature request/
+          - link /Feature request/
         - listitem:
-          - text: /Billing question/
+          - link /Billing question/
         - listitem:
-          - text: /Cannot login to dashboard/
+          - link /Cannot login to dashboard/
     `);
     },
   );

@@ -6,7 +6,8 @@ import { createAuthRouter } from "./auth/routes.js";
 import { GeminiProvider } from "./llm/gemini.js";
 import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
-import { appRouter, isDbConfigured } from "./tickets/router.js";
+import { createDraftRouter } from "./tickets/draft.js";
+import { appRouter, getMessageStore, getStore, isDbConfigured } from "./tickets/router.js";
 
 // Thrown when LLM_PROVIDER selects a real provider whose required config is
 // missing. Surfaced as 500 provider_misconfigured — never a silent mock
@@ -29,8 +30,9 @@ export function createApp() {
   app.get("/api/health", (c) => c.json({ ok: true }));
 
   // Session store lives for the life of this app instance (in-memory), so all
-  // /api/auth/* requests against one createApp() share it.
-  const { router: authRouter } = createAuthRouter();
+  // /api/auth/* requests against one createApp() share it. resolveUser reads the
+  // same store to inject the session user into the oRPC context below.
+  const { router: authRouter, resolveUser } = createAuthRouter();
   app.route("/api/auth", authRouter);
 
   // DB config guard: tickets is now postgres-backed, so a missing DATABASE_URL
@@ -46,10 +48,30 @@ export function createApp() {
 
   const rpcHandler = new RPCHandler(appRouter);
   app.use("/api/rpc/*", async (c, next) => {
-    const { matched, response } = await rpcHandler.handle(c.req.raw, { prefix: "/api/rpc" });
+    // Inject the resolved session user so procedures (tickets.create/reply) can
+    // author from context instead of trusting client input. Null when
+    // unauthenticated.
+    const { matched, response } = await rpcHandler.handle(c.req.raw, {
+      prefix: "/api/rpc",
+      context: { user: resolveUser(c) },
+    });
     if (matched) return c.newResponse(response.body, response);
     await next();
   });
+
+  // reply-draft (spec: specs/reply-draft.md): POST /api/tickets/draft streams an
+  // LLM reply draft as SSE. Same DB guard as /api/rpc/* — a missing DATABASE_URL
+  // is 500 db_misconfigured before any store query, never a silent failure.
+  app.use("/api/tickets/*", async (c, next) => {
+    if (!isDbConfigured()) {
+      return c.json({ error: "db_misconfigured" }, 500);
+    }
+    await next();
+  });
+  app.route(
+    "/api/tickets",
+    createDraftRouter({ resolveUser, ticketStore: getStore, messageStore: getMessageStore }),
+  );
 
   app.post("/api/chat", async (c) => {
     let body: unknown;
