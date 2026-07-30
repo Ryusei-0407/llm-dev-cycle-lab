@@ -1,6 +1,7 @@
 import { ORPCError, os } from "@orpc/server";
 import type { User } from "../auth/users.js";
 import { createPool } from "../db.js";
+import { createRealtimeHub, type RealtimeHub } from "../realtime.js";
 import { createMessageStore, type MessageStore } from "./messages.js";
 import { createInput, getInput, replyInput, setStatusInput } from "./schema.js";
 import { createTicketStore, NotFoundError, type TicketStore } from "./store.js";
@@ -77,76 +78,90 @@ async function loadAuthorizedTicket(user: User, id: string) {
 }
 
 // oRPC drops the query/mutation distinction: every procedure is a .handler().
-// The router is a plain object, not a builder call.
-export const ticketsRouter = {
-  // Role-scoped list: an agent sees every ticket; a customer sees only their own
-  // (store filter by requesterEmail). Session required.
-  list: base.handler(({ context }) => {
-    const user = requireUser(context.user);
-    return user.role === "agent"
-      ? getStore().list()
-      : getStore().list({ requesterEmail: user.email });
-  }),
-
-  create: base
-    .input(createInput)
-    // requesterEmail is derived from the session user, not the public input:
-    // create is session-required, so context.user null is UNAUTHORIZED.
-    .handler(({ input, context }) => {
+// The router is built per-app so the ws-realtime hub can be injected: after a
+// successful create/setStatus/reply the handler broadcasts a {type, ticketId}
+// event through `hub`, and open clients invalidate their own authorised query.
+// draft (下書き) deliberately does NOT broadcast (spec: specs/ws-realtime.md).
+export function createTicketsRouter(hub: RealtimeHub) {
+  return {
+    // Role-scoped list: an agent sees every ticket; a customer sees only their own
+    // (store filter by requesterEmail). Session required.
+    list: base.handler(({ context }) => {
       const user = requireUser(context.user);
-      return getStore().create({ ...input, requesterEmail: user.email });
+      return user.role === "agent"
+        ? getStore().list()
+        : getStore().list({ requesterEmail: user.email });
     }),
 
-  // setStatus is agent-only: a customer is FORBIDDEN even for their own ticket
-  // (specs/authz.md). Session required.
-  setStatus: base.input(setStatusInput).handler(async ({ input, context }) => {
-    const user = requireUser(context.user);
-    if (user.role !== "agent") {
-      throw new ORPCError("FORBIDDEN", { message: "agent only" });
-    }
-    try {
-      return await getStore().setStatus(input.id, input.status);
-    } catch (err) {
-      if (err instanceof NotFoundError) {
-        throw new ORPCError("NOT_FOUND", { message: "ticket not found" });
+    create: base
+      .input(createInput)
+      // requesterEmail is derived from the session user, not the public input:
+      // create is session-required, so context.user null is UNAUTHORIZED.
+      .handler(async ({ input, context }) => {
+        const user = requireUser(context.user);
+        const ticket = await getStore().create({ ...input, requesterEmail: user.email });
+        hub.broadcast({ type: "ticket.created", ticketId: ticket.id });
+        return ticket;
+      }),
+
+    // setStatus is agent-only: a customer is FORBIDDEN even for their own ticket
+    // (specs/authz.md). Session required.
+    setStatus: base.input(setStatusInput).handler(async ({ input, context }) => {
+      const user = requireUser(context.user);
+      if (user.role !== "agent") {
+        throw new ORPCError("FORBIDDEN", { message: "agent only" });
       }
-      throw err;
-    }
-  }),
-
-  // Ticket detail: the ticket plus its thread. Existence → ownership: a missing
-  // ticket is NOT_FOUND, a customer's cross-owner access is FORBIDDEN.
-  get: base.input(getInput).handler(async ({ input, context }) => {
-    const user = requireUser(context.user);
-    const ticket = await loadAuthorizedTicket(user, input.id);
-    const messages = await getMessageStore().listByTicket(input.id);
-    return { ticket, messages };
-  }),
-
-  // Post a reply. The author is the session user (context.user), never client
-  // input. Existence → ownership gates it (missing → NOT_FOUND, cross-owner
-  // customer → FORBIDDEN) before the message is created.
-  reply: base.input(replyInput).handler(async ({ input, context }) => {
-    const user = requireUser(context.user);
-    await loadAuthorizedTicket(user, input.ticketId);
-    try {
-      return await getMessageStore().create({
-        ticketId: input.ticketId,
-        authorEmail: user.email,
-        authorRole: user.role,
-        body: input.body,
-      });
-    } catch (err) {
-      if (err instanceof NotFoundError) {
-        throw new ORPCError("NOT_FOUND", { message: "ticket not found" });
+      try {
+        const ticket = await getStore().setStatus(input.id, input.status);
+        hub.broadcast({ type: "ticket.updated", ticketId: input.id });
+        return ticket;
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ORPCError("NOT_FOUND", { message: "ticket not found" });
+        }
+        throw err;
       }
-      throw err;
-    }
-  }),
-};
+    }),
 
+    // Ticket detail: the ticket plus its thread. Existence → ownership: a missing
+    // ticket is NOT_FOUND, a customer's cross-owner access is FORBIDDEN.
+    get: base.input(getInput).handler(async ({ input, context }) => {
+      const user = requireUser(context.user);
+      const ticket = await loadAuthorizedTicket(user, input.id);
+      const messages = await getMessageStore().listByTicket(input.id);
+      return { ticket, messages };
+    }),
+
+    // Post a reply. The author is the session user (context.user), never client
+    // input. Existence → ownership gates it (missing → NOT_FOUND, cross-owner
+    // customer → FORBIDDEN) before the message is created.
+    reply: base.input(replyInput).handler(async ({ input, context }) => {
+      const user = requireUser(context.user);
+      await loadAuthorizedTicket(user, input.ticketId);
+      try {
+        const message = await getMessageStore().create({
+          ticketId: input.ticketId,
+          authorEmail: user.email,
+          authorRole: user.role,
+          body: input.body,
+        });
+        hub.broadcast({ type: "message.created", ticketId: input.ticketId });
+        return message;
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ORPCError("NOT_FOUND", { message: "ticket not found" });
+        }
+        throw err;
+      }
+    }),
+  };
+}
+
+// Type anchor for the oRPC client (apps/web/src/lib/orpc.ts imports AppRouter).
+// Built with a throwaway hub purely to fix the router shape at the type level;
+// the running app constructs its own router with the live hub in createApp.
 export const appRouter = {
-  tickets: ticketsRouter,
+  tickets: createTicketsRouter(createRealtimeHub()),
 };
 
 export type AppRouter = typeof appRouter;
