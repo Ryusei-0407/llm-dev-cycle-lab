@@ -4,6 +4,7 @@ import { createMiddleware } from "hono/factory";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { Pool } from "../db.js";
 import { createDbSessionStore } from "./session.js";
+import { createPasskeyRouter, type PasskeyVerifier } from "./passkey.js";
 import { userById, verifyCredentials, type User } from "./users.js";
 
 const SID = "sid";
@@ -16,7 +17,7 @@ type AuthEnv = { Variables: { user: User } };
 // invalid_credentials — the client tells the two apart, per specs/auth.md).
 // pool-backed now (spec: specs/auth-db.md): sessions + users live in postgres,
 // so credential/session lookups are async.
-export function createAuthRouter(pool: Pool) {
+export function createAuthRouter(pool: Pool, passkeyVerifier?: PasskeyVerifier) {
   const sessions = createDbSessionStore(pool);
 
   // sid cookie → session → User, or null when absent/invalid. Shared by
@@ -69,6 +70,21 @@ export function createAuthRouter(pool: Pool) {
   });
 
   router.get("/me", requireAuth, (c) => c.json({ user: c.get("user") }));
+
+  // Passkey sub-router (spec: specs/passkey.md). Shares the same session store
+  // and sid cookie so a passkey login is indistinguishable from a password one
+  // downstream. The verifier is injected in unit tests (stub) and defaults to
+  // the real @simplewebauthn one otherwise.
+  router.route(
+    "/passkey",
+    createPasskeyRouter({
+      pool,
+      sessions,
+      cookieName: SID,
+      resolveUser,
+      verifier: passkeyVerifier,
+    }),
+  );
 
   return { router, requireAuth, resolveUser };
 }

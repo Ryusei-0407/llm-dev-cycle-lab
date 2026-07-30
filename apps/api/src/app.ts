@@ -4,6 +4,7 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { createAuthRouter } from "./auth/routes.js";
+import type { PasskeyVerifier } from "./auth/passkey.js";
 import { createPool } from "./db.js";
 import { GeminiProvider } from "./llm/gemini.js";
 import { MockProvider } from "./llm/mock.js";
@@ -36,7 +37,11 @@ function getProvider(): LLMProvider {
 // tickets router broadcasts ticket changes through it, and unit tests inject a
 // recording hub to observe those broadcasts without opening a socket. Default —
 // a fresh in-memory hub — leaves existing callers (index.ts) unaffected.
-export type CreateAppOptions = { hub?: RealtimeHub };
+export type CreateAppOptions = { hub?: RealtimeHub; passkeyVerifier?: PasskeyVerifier };
+
+// Re-exported so the passkey unit tests inject the stub verifier through the
+// same createApp seam as { hub } (spec: specs/passkey.md — 検証器は注入可能に).
+export type { PasskeyVerifier } from "./auth/passkey.js";
 
 // The node-ws injector must run against the node http server (index.ts), but is
 // created here where the app is. Attached to the returned app so index.ts can
@@ -59,6 +64,7 @@ export function createApp(options: CreateAppOptions = {}): App {
   // the same pool to inject the session user into the oRPC context below.
   const { router: authRouter, resolveUser } = createAuthRouter(
     createPool(process.env.DATABASE_URL ?? ""),
+    options.passkeyVerifier,
   );
   app.route("/api/auth", authRouter);
 
