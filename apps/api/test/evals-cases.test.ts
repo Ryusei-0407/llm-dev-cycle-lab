@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -209,4 +209,47 @@ describe("bundled eval cases", () => {
       }
     },
   );
+});
+
+// 敵対的レビューの反証固定(@pinned 相当)。いずれもレビューが実行再現した
+// 反例をテスト資産化したもの — 実装側の修正(cases.ts)を殺すミューテーション
+// から守る。
+describe("loadCases pinned counterexamples", () => {
+  it("*.json 名のディレクトリ(I/O エラー)もファイル名入りで throw する", () => {
+    const dir = fixtureDir();
+    // readFileSync が EISDIR を投げる攻撃入力。try 外にあると生のエラーが漏れる。
+    mkdirSync(join(dir, "trap.json"));
+    writeCase(dir, "ok.json", validCase("ok"));
+    expect(() => loadCases(dir)).toThrowError(/evals case trap\.json:/);
+  });
+
+  it('空文字列の mustMention 語は schema で弾く(includes("") 常時 true の抜け穴)', () => {
+    const dir = fixtureDir();
+    writeCase(dir, "empty-term.json", validCase("empty-term", { mustMention: [""] }));
+    expect(() => loadCases(dir)).toThrowError(/evals case empty-term\.json:/);
+  });
+
+  it("空文字列の mustNotMention 語も同様に弾く", () => {
+    const dir = fixtureDir();
+    writeCase(dir, "empty-forbid.json", validCase("empty-forbid", { mustNotMention: [""] }));
+    expect(() => loadCases(dir)).toThrowError(/evals case empty-forbid\.json:/);
+  });
+
+  it("minChars > maxChars(length が永久 fail する設定ミス)を弾く", () => {
+    const dir = fixtureDir();
+    writeCase(dir, "bounds.json", validCase("bounds", { minChars: 500, maxChars: 100 }));
+    expect(() => loadCases(dir)).toThrowError(
+      /evals case bounds\.json: minChars must be <= maxChars/,
+    );
+  });
+
+  it("既定値との組み合わせでも bounds を検証する(minChars 2000 + maxChars 省略)", () => {
+    const dir = fixtureDir();
+    const noMax = validCase("no-max", { minChars: 2000 });
+    delete noMax.maxChars;
+    writeCase(dir, "no-max.json", noMax);
+    expect(() => loadCases(dir)).toThrowError(
+      /evals case no-max\.json: minChars must be <= maxChars/,
+    );
+  });
 });
