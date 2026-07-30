@@ -1,3 +1,4 @@
+import { createNodeWebSocket } from "@hono/node-ws";
 import { GoogleGenAI } from "@google/genai";
 import { RPCHandler } from "@orpc/server/fetch";
 import { Hono } from "hono";
@@ -7,8 +8,14 @@ import { createPool } from "./db.js";
 import { GeminiProvider } from "./llm/gemini.js";
 import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
+import { createRealtimeHub, type RealtimeHub } from "./realtime.js";
 import { createDraftRouter } from "./tickets/draft.js";
-import { appRouter, getMessageStore, getStore, isDbConfigured } from "./tickets/router.js";
+import {
+  createTicketsRouter,
+  getMessageStore,
+  getStore,
+  isDbConfigured,
+} from "./tickets/router.js";
 
 // Thrown when LLM_PROVIDER selects a real provider whose required config is
 // missing. Surfaced as 500 provider_misconfigured — never a silent mock
@@ -25,8 +32,23 @@ function getProvider(): LLMProvider {
   return new MockProvider();
 }
 
-export function createApp() {
+// createApp gains an optional { hub } seam (spec: specs/ws-realtime.md): the
+// tickets router broadcasts ticket changes through it, and unit tests inject a
+// recording hub to observe those broadcasts without opening a socket. Default —
+// a fresh in-memory hub — leaves existing callers (index.ts) unaffected.
+export type CreateAppOptions = { hub?: RealtimeHub };
+
+// The node-ws injector must run against the node http server (index.ts), but is
+// created here where the app is. Attached to the returned app so index.ts can
+// reach it without a second construction path.
+export type App = Hono & {
+  injectWebSocket: ReturnType<typeof createNodeWebSocket>["injectWebSocket"];
+};
+
+export function createApp(options: CreateAppOptions = {}): App {
   const app = new Hono();
+  const hub = options.hub ?? createRealtimeHub();
+  const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
   app.get("/api/health", (c) => c.json({ ok: true }));
 
@@ -40,6 +62,26 @@ export function createApp() {
   );
   app.route("/api/auth", authRouter);
 
+  // /api/ws: realtime fan-out endpoint. Session-required — an unauthenticated
+  // upgrade is closed with 1008 (policy violation) so an anonymous client never
+  // joins the hub. The socket carries no per-client state: it only receives
+  // {type, ticketId} events and re-fetches through its own authorised queries.
+  app.get(
+    "/api/ws",
+    upgradeWebSocket(async (c) => {
+      const user = await resolveUser(c);
+      return {
+        onOpen: (_event, ws) => {
+          if (!user) {
+            ws.close(1008, "unauthenticated");
+            return;
+          }
+          hub.register(ws);
+        },
+      };
+    }),
+  );
+
   // DB config guard: tickets is now postgres-backed, so a missing DATABASE_URL
   // is a 500 db_misconfigured (same shape as the LLM provider_misconfigured
   // guard) rather than a silent failure. Runs before the oRPC handler so no
@@ -51,7 +93,7 @@ export function createApp() {
     await next();
   });
 
-  const rpcHandler = new RPCHandler(appRouter);
+  const rpcHandler = new RPCHandler({ tickets: createTicketsRouter(hub) });
   app.use("/api/rpc/*", async (c, next) => {
     // Inject the resolved session user so procedures (tickets.create/reply) can
     // author from context instead of trusting client input. Null when
@@ -115,5 +157,5 @@ export function createApp() {
     });
   });
 
-  return app;
+  return Object.assign(app, { injectWebSocket });
 }

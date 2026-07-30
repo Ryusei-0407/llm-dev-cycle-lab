@@ -49,5 +49,12 @@
     "apps/web/src/components/ticket-list.tsx",
     "apps/web/src/routes/__root.tsx"
   ],
-  "kanban": ["apps/web/src/routes/board.tsx", "apps/web/src/components/kanban-board.tsx"]
+  "kanban": ["apps/web/src/routes/board.tsx", "apps/web/src/components/kanban-board.tsx"],
+  "ws-realtime": [
+    "apps/api/src/realtime.ts",
+    "apps/api/src/app.ts",
+    "apps/api/src/tickets/router.ts",
+    "apps/web/src/lib/realtime.ts",
+    "apps/web/src/routes/__root.tsx"
+  ]
 }
