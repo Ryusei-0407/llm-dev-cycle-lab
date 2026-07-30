@@ -10,7 +10,7 @@
                 → ユニット green → その機能のモックE2E green = 機能完了
                         ↑ 改善タスクが還流
 [PRレーン]      モックE2Eのみ・chromiumのみ・変更パスのみ(目標5分)
-[nightly]       フルE2E + @backend結合 (+ 将来: 実LLMスモーク / Evals)
+[nightly]       フルE2E + @backend結合 + 実LLMスモーク + Evals
 [perfレーン]    trace全記録 → trace-analyst が解析 → 改善タスク化 → 機能サイクルへ
 ```
 
@@ -51,10 +51,10 @@
   実バックエンド+決定的モックプロバイダの @backend テストが担う
 - 内容の質をE2Eでどうしても見る場合のみ LLM-as-judge(llm-assert 等)を限定使用
 
-現状: モックのみで完結(Evals・実LLM接続は未導入)。**未検証なのは「実LLMの実挙動」
-に依存する部分のみ**: 実プロバイダのSSE形式差異・レイテンシ・タイムアウト、および
-LLM-as-judge の判定品質。パイプライン自体は @backend レーンで検証済みで、実LLM化は
-プロバイダ実装+環境変数の追加だけでテストコードは不変。
+現状: PR レーンはモックで完結し、実LLM は nightly の2ジョブが担う —
+llm-smoke(@backend の実 Gemini 結合)と Evals(reply-draft の品質回帰、
+specs/evals.md)。無料枠のクォータはモデル別・20リクエスト/日のため、生成
+(gemini-flash)と judge(gemini-flash-lite)でモデルを分けて1晩に収めている。
 
 ### 2.3 機能単位の漸進的E2E
 
