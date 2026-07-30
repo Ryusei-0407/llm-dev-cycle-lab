@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { snap } from "../helpers/snap";
 
 // E2E for the ticket-detail feature (spec: specs/ticket-detail.md). Runs against

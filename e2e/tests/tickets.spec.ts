@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { snap } from "../helpers/snap";
 
 // Mock-first E2E for the tickets feature. The happy path runs against the

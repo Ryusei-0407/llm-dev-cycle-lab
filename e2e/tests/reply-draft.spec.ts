@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { aguiDraftBody, aguiDraftErrorBody } from "../helpers/agui-sse";
 import { snap } from "../helpers/snap";
 

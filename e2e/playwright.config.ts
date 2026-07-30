@@ -54,17 +54,22 @@ export default defineConfig({
       ? {
           mode: "on" as const,
           size: { width: 1280, height: 720 },
-          // 日本語の test.step 名(右上)を主ナレーションに、英語のアクション字幕
-          // (左上、Playwright 内部でハードコードされておりローカライズ不可)は
-          // 小さめの補助表示に落とす
+          // オーバーレイ方針: 録画に残す文字は日本語の test.step ナレーションのみ。
+          // - actions レイヤーは cursor/要素ハイライト(クリックの視認性)のために
+          //   残すが、英語のアクション字幕は Playwright 内部でハードコードされ字幕
+          //   だけの無効化APIが無いため fontSize を 1px に落として実質不可視にする
+          //   (カーソルと要素ハイライトは fontSize と独立に描画されるので影響なし)。
+          // - test レイヤー(show.test)は設定しない。組み込みオーバーレイは英語の
+          //   titlePath(ファイル名 › describe名 › テスト名)を必ずステップ前に重ねる
+          //   ため。日本語ステップだけの描画は e2e/fixtures.ts の自前オーバーレイが
+          //   担う(page.screencast.showOverlay 経由)。
           show: {
             actions: {
               cursor: "pointer" as const,
               position: "top-left" as const,
-              duration: 800,
-              fontSize: 16,
+              duration: 700,
+              fontSize: 1,
             },
-            test: { level: "step" as const, position: "top-right" as const, fontSize: 22 },
           },
         }
       : "retain-on-failure",
