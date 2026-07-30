@@ -6,6 +6,9 @@ name: update-snapshots
 
 on:
   workflow_dispatch:
+  # bootstrap 用の一時トリガー(コンポーネント baseline 生成後に削除):
+  push:
+    branches: [feat/visual-regression]
 
 permissions:
   contents: write
