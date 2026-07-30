@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { snap } from "../helpers/snap";
 
 // Full-stack test against the real API for the reply-draft feature (spec:

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { snap } from "../helpers/snap";
 
 // Full-stack tests against the real API (mock provider). Assertions are
