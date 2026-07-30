@@ -10,6 +10,7 @@ import { GeminiProvider } from "./llm/gemini.js";
 import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
 import { createRealtimeHub, type RealtimeHub } from "./realtime.js";
+import { serverTiming } from "./server-timing.js";
 import { createDraftRouter } from "./tickets/draft.js";
 import {
   createTicketsRouter,
@@ -54,6 +55,10 @@ export function createApp(options: CreateAppOptions = {}): App {
   const app = new Hono();
   const hub = options.hub ?? createRealtimeHub();
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+
+  // 全 /api/* に Server-Timing(app 合計 + db 内訳)を付与。ルート登録より
+  // 先に use しないと包めないため、ここが定位置(server-timing.ts 参照)。
+  app.use("/api/*", serverTiming);
 
   app.get("/api/health", (c) => c.json({ ok: true }));
 
