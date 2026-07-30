@@ -54,9 +54,17 @@ export default defineConfig({
       ? {
           mode: "on" as const,
           size: { width: 1280, height: 720 },
+          // 日本語の test.step 名(右上)を主ナレーションに、英語のアクション字幕
+          // (左上、Playwright 内部でハードコードされておりローカライズ不可)は
+          // 小さめの補助表示に落とす
           show: {
-            actions: { cursor: "pointer" as const, position: "top-left" as const, duration: 800 },
-            test: { level: "step" as const, position: "top-right" as const },
+            actions: {
+              cursor: "pointer" as const,
+              position: "top-left" as const,
+              duration: 800,
+              fontSize: 16,
+            },
+            test: { level: "step" as const, position: "top-right" as const, fontSize: 22 },
           },
         }
       : "retain-on-failure",

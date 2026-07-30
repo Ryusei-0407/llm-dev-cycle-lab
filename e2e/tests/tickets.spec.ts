@@ -15,7 +15,7 @@ test.describe("tickets over tRPC @feature-tickets", () => {
       },
     },
     async ({ page }, testInfo) => {
-      await test.step("load the tickets page", async () => {
+      await test.step("チケットページを読み込む", async () => {
         await page.goto("/tickets");
         // シード3件の存在をアンカーで確認する。絶対件数は使わない: E2E ファイル群は
         // 1つのDBを共有するため、他ファイルの create が並走すると行数は増えうる
@@ -29,13 +29,13 @@ test.describe("tickets over tRPC @feature-tickets", () => {
         await snap(page, testInfo, "初期表示");
       });
 
-      await test.step("open the new ticket form", async () => {
+      await test.step("新規チケットフォームを開く", async () => {
         await page.getByRole("button", { name: "New ticket" }).click();
         await expect(page.getByLabel("Subject")).toBeVisible();
         await snap(page, testInfo, "作成フォーム");
       });
 
-      await test.step("submit a new ticket", async () => {
+      await test.step("新規チケットを送信する", async () => {
         await page.getByLabel("Subject").fill("Printer on fire");
         await page.getByRole("button", { name: "Create" }).click();
         // 絶対件数・先頭位置は使わない(共有DBに並走 create が乗りうるため)。
@@ -77,19 +77,19 @@ test.describe("tickets over tRPC @feature-tickets", () => {
       // 件数は絶対値でなく前後比較にする: ストアはEEラン全体で共有され、
       // 他テストの作成分が混ざりうる(実行順・並列度に依存しない検証にする)
       let before = 0;
-      await test.step("load the tickets page", async () => {
+      await test.step("チケットページを読み込む", async () => {
         await page.goto("/tickets");
         await expect(page.getByTestId("ticket-row").first()).toBeVisible();
         before = await page.getByTestId("ticket-row").count();
         await snap(page, testInfo, "初期表示");
       });
 
-      await test.step("submit an empty subject", async () => {
+      await test.step("空の件名で送信する", async () => {
         await page.getByRole("button", { name: "New ticket" }).click();
         await page.getByRole("button", { name: "Create" }).click();
       });
 
-      await test.step("see the validation error", async () => {
+      await test.step("バリデーションエラー表示を確認する", async () => {
         await expect(page.getByTestId("ticket-error")).toBeVisible();
         await expect(page.getByTestId("ticket-row")).toHaveCount(before);
         await snap(page, testInfo, "バリデーションエラー");
@@ -114,11 +114,11 @@ test.describe("tickets over tRPC @feature-tickets", () => {
         }),
       );
 
-      await test.step("load the tickets page with a failing list query", async () => {
+      await test.step("一覧取得が失敗する状態でチケットページを読み込む", async () => {
         await page.goto("/tickets");
       });
 
-      await test.step("see the load error", async () => {
+      await test.step("読み込みエラー表示を確認する", async () => {
         await expect(page.getByTestId("tickets-load-error")).toBeVisible();
         await expect(page.getByTestId("ticket-row")).toHaveCount(0);
         await snap(page, testInfo, "読み込みエラー");

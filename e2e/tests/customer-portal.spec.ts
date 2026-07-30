@@ -64,17 +64,17 @@ test.describe("customer-portal @feature-customer-portal", () => {
       },
     },
     async ({ page, request }, testInfo) => {
-      await test.step("create a portal-owned ticket over the API", async () => {
+      await test.step("ポータル検証用のチケットをAPIで作成する", async () => {
         await createOwnTicket(request, OWN_SUBJECT);
       });
 
-      await test.step("open the tickets list as a customer", async () => {
+      await test.step("顧客としてチケット一覧を開く", async () => {
         await page.goto("/tickets");
         await expect(page.getByTestId("ticket-row").first()).toBeVisible();
         await snap(page, testInfo, "一覧表示");
       });
 
-      await test.step("no agent-only status control is shown", async () => {
+      await test.step("担当者専用のステータス操作が無いことを確認する", async () => {
         // 担当者向け操作(status 変更)は customer には出さない。spec が名指しする
         // data-testid と、現状 UI の実体(role=combobox の select)の両面で不在を見る。
         await expect(page.getByTestId("ticket-status-select")).toHaveCount(0);
@@ -82,19 +82,19 @@ test.describe("customer-portal @feature-customer-portal", () => {
         await snap(page, testInfo, "担当者操作なし");
       });
 
-      await test.step("open the customer's own ticket", async () => {
+      await test.step("自分のチケットを開く", async () => {
         await page.getByTestId("ticket-link").filter({ hasText: OWN_SUBJECT }).click();
         await expect(page.getByTestId("ticket-subject")).toContainText(OWN_SUBJECT);
         await expect(page.getByTestId("ticket-forbidden")).toBeHidden();
         await snap(page, testInfo, "詳細表示");
       });
 
-      await test.step("no Generate draft (agent-only tool) on the detail", async () => {
+      await test.step("詳細画面にドラフト生成(担当者専用)が無いことを確認する", async () => {
         await expect(page.getByTestId("generate-draft")).toHaveCount(0);
         await snap(page, testInfo, "ドラフト操作なし");
       });
 
-      await test.step("post a reply on the own ticket", async () => {
+      await test.step("自分のチケットに返信を投稿する", async () => {
         // 相対比較: シードの絶対件数ではなく「返信で1件増える」ことを見る。
         const before = await page.getByTestId("message-item").count();
         await page.getByLabel("Reply").fill("Thanks, I've tried again and it still fails.");
@@ -126,15 +126,15 @@ test.describe("customer-portal @feature-customer-portal", () => {
     },
     async ({ page, request }, testInfo) => {
       let agentTicketId = "";
-      await test.step("prepare an agent-owned ticket over the API", async () => {
+      await test.step("担当者所有のチケットをAPIで準備する", async () => {
         agentTicketId = await createAgentTicket(request, "Agent-only ticket (forbidden target)");
       });
 
-      await test.step("navigate directly to the agent's ticket", async () => {
+      await test.step("担当者のチケットへ直接アクセスする", async () => {
         await page.goto(`/tickets/${agentTicketId}`);
       });
 
-      await test.step("see the forbidden panel, not the thread", async () => {
+      await test.step("スレッドではなく閲覧不可パネルが出ることを確認する", async () => {
         await expect(page.getByTestId("ticket-forbidden")).toBeVisible();
         await expect(page.getByTestId("ticket-not-found")).toBeHidden();
         await expect(page.getByTestId("message-thread")).toBeHidden();
@@ -154,17 +154,17 @@ test.describe("customer-portal @feature-customer-portal", () => {
     },
     async ({ page, request }, testInfo) => {
       const agentSubject = "Agent-only ticket (list-leak check)";
-      await test.step("prepare an agent-owned ticket over the API", async () => {
+      await test.step("担当者所有のチケットをAPIで準備する", async () => {
         await createAgentTicket(request, agentSubject);
       });
 
-      await test.step("load the customer's tickets list", async () => {
+      await test.step("顧客のチケット一覧を読み込む", async () => {
         await page.goto("/tickets");
         await expect(page.getByTestId("ticket-row").first()).toBeVisible();
         await snap(page, testInfo, "一覧表示");
       });
 
-      await test.step("the agent's subject is absent from the list", async () => {
+      await test.step("担当者のチケットが一覧に無いことを確認する", async () => {
         await expect(page.getByTestId("ticket-link").filter({ hasText: agentSubject })).toHaveCount(
           0,
         );

@@ -40,7 +40,7 @@ test.describe("ws-realtime over WebSocket @feature-ws-realtime", () => {
     async ({ page, request }, testInfo) => {
       const subject = `WS live: ${test.info().testId} tape drive rewinding`;
 
-      await test.step("open the tickets list and wait for the live socket", async () => {
+      await test.step("チケット一覧を開きライブ接続を待つ", async () => {
         // 自動更新の前提となる /api/ws 接続が確立するのを待つ。固定待ちは使わず、
         // WebSocket ハンドシェイクの成立をイベントで待つ。接続はページロード中に
         // 張られるため、リスナーは goto より先に登録する(後付けだと取り逃がす)
@@ -53,11 +53,11 @@ test.describe("ws-realtime over WebSocket @feature-ws-realtime", () => {
         await snap(page, testInfo, "初期表示");
       });
 
-      await test.step("create a ticket from another source (API)", async () => {
+      await test.step("別ソース(API)からチケットを作成する", async () => {
         await createTicket(request, subject);
       });
 
-      await test.step("the new ticket appears without a reload", async () => {
+      await test.step("リロード無しで新チケットが表示されることを確認する", async () => {
         // reload を呼ばない: WebSocket が invalidate を駆動して一覧が更新される
         // ことだけで、この行が現れる。
         await expect(page.getByTestId("ticket-row").filter({ hasText: subject })).toBeVisible();
@@ -91,7 +91,7 @@ test.describe("ws-realtime over WebSocket @feature-ws-realtime", () => {
       },
     },
     async ({ page }, testInfo) => {
-      await test.step("block the realtime socket before loading", async () => {
+      await test.step("読み込み前にリアルタイム接続をブロックする", async () => {
         // 接続そのものを成立させない: ハンドラ内で ws を触らないことで
         // ブラウザ側の接続を宙吊りにする(サーバへ到達させない)。
         await page.routeWebSocket(/\/api\/ws/, () => {
@@ -99,14 +99,14 @@ test.describe("ws-realtime over WebSocket @feature-ws-realtime", () => {
         });
       });
 
-      await test.step("load the tickets list with the socket blocked", async () => {
+      await test.step("接続ブロック状態でチケット一覧を読み込む", async () => {
         await page.goto("/tickets");
         await expect(page.getByTestId("ticket-row").first()).toBeVisible();
         await expect(page.getByTestId("tickets-load-error")).toBeHidden();
         await snap(page, testInfo, "WSブロック時の一覧");
       });
 
-      await test.step("manual create still works", async () => {
+      await test.step("手動のチケット作成が機能することを確認する", async () => {
         await page.getByRole("button", { name: "New ticket" }).click();
         await page.getByLabel("Subject").fill("WS blocked: manual create still works");
         await page.getByRole("button", { name: "Create" }).click();
@@ -131,7 +131,7 @@ test.describe("ws-realtime over WebSocket @feature-ws-realtime", () => {
       },
     },
     async ({ page }, testInfo) => {
-      await test.step("let the socket connect, then drop it", async () => {
+      await test.step("接続を確立させてから切断する", async () => {
         await page.routeWebSocket(/\/api\/ws/, async (ws) => {
           // 接続はサーバへ通す(自動更新の通常経路)が、直後に切断して
           // クライアントの再接続/耐障害パスを起動する。
@@ -140,13 +140,13 @@ test.describe("ws-realtime over WebSocket @feature-ws-realtime", () => {
         });
       });
 
-      await test.step("load the tickets list over the dropped socket", async () => {
+      await test.step("切断状態でチケット一覧を読み込む", async () => {
         await page.goto("/tickets");
         await expect(page.getByTestId("ticket-row").first()).toBeVisible();
         await snap(page, testInfo, "切断後の一覧");
       });
 
-      await test.step("no realtime error UI is shown and the list stays usable", async () => {
+      await test.step("エラーUIが出ず一覧が使えることを確認する", async () => {
         // 緩和条項: 再接続後の反映までは検証せず、「切断でエラーUIが出ない」ことを固定。
         await expect(page.getByTestId("realtime-error")).toHaveCount(0);
         await expect(page.getByTestId("tickets-load-error")).toBeHidden();
@@ -199,7 +199,7 @@ test.describe("ws-realtime over WebSocket @feature-ws-realtime", () => {
     async ({ page, request }, testInfo) => {
       const subject = `WS detail live: ${test.info().testId}`;
       let ticketId = "";
-      await test.step("prepare a test-owned ticket and open its detail", async () => {
+      await test.step("テスト用チケットを準備して詳細を開く", async () => {
         ticketId = await createTicket(request, subject);
         const liveSocket = page.waitForEvent("websocket", {
           predicate: (ws) => ws.url().includes("/api/ws"),
@@ -210,7 +210,7 @@ test.describe("ws-realtime over WebSocket @feature-ws-realtime", () => {
         await snap(page, testInfo, "詳細表示");
       });
 
-      await test.step("post a reply over the API and watch it appear live", async () => {
+      await test.step("APIで返信を投稿しライブ反映を確認する", async () => {
         const before = await page.getByTestId("message-item").count();
         const res = await request.post("/api/rpc/tickets/reply", {
           data: { json: { ticketId, body: "Live reply over the wire." } },

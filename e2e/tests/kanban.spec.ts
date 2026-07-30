@@ -46,11 +46,11 @@ test.describe("kanban board @feature-kanban", () => {
     async ({ page, request }, testInfo) => {
       const subject = ownSubject(testInfo);
       let ticketId = "";
-      await test.step("create a board-owned ticket over the API", async () => {
+      await test.step("ボード検証用のチケットをAPIで作成する", async () => {
         ticketId = await createTicket(request, subject);
       });
 
-      await test.step("open the board as an agent", async () => {
+      await test.step("担当者としてボードを開く", async () => {
         await page.goto("/board");
         await expect(page.getByTestId("kanban-column-open")).toBeVisible();
         await expect(page.getByTestId("kanban-column-in_progress")).toBeVisible();
@@ -64,12 +64,12 @@ test.describe("kanban board @feature-kanban", () => {
         .filter({ hasText: subject });
       const targetColumn = page.getByTestId("kanban-column-in_progress");
 
-      await test.step("the created ticket starts in the Open column", async () => {
+      await test.step("作成したチケットが Open 列にあることを確認する", async () => {
         await expect(ownCard).toBeVisible();
         await snap(page, testInfo, "ドラッグ前");
       });
 
-      await test.step("drag the card into the In progress column", async () => {
+      await test.step("カードを In progress 列へドラッグする", async () => {
         await page.dragAndDrop(
           `[data-testid="kanban-column-open"] [data-testid="kanban-card"]:has-text("${subject}")`,
           `[data-testid="kanban-column-in_progress"]`,
@@ -83,7 +83,7 @@ test.describe("kanban board @feature-kanban", () => {
         await snap(page, testInfo, "ドラッグ後");
       });
 
-      await test.step("the new status persists on the tickets list", async () => {
+      await test.step("新しいステータスが永続していることを確認する", async () => {
         await page.goto(`/tickets/${ticketId}`);
         // 詳細画面の status バッジが in_progress を示す(永続の確認)。
         await expect(page.getByTestId("status-badge")).toContainText(/in progress/i);
@@ -114,11 +114,11 @@ test.describe("kanban board @feature-kanban", () => {
     },
     async ({ page, request }, testInfo) => {
       const subject = `Kanban failure ${testInfo.testId} r${testInfo.retry}: coffee machine offline`;
-      await test.step("create a board-owned ticket over the API", async () => {
+      await test.step("ボード検証用のチケットをAPIで作成する", async () => {
         await createTicket(request, subject);
       });
 
-      await test.step("fail every setStatus call at the network layer", async () => {
+      await test.step("ネットワーク層で setStatus を全て失敗させる", async () => {
         await page.route("**/api/rpc/tickets/setStatus", (route) =>
           route.fulfill({
             status: 500,
@@ -133,13 +133,13 @@ test.describe("kanban board @feature-kanban", () => {
         .getByTestId("kanban-card")
         .filter({ hasText: subject });
 
-      await test.step("open the board and locate the card in Open", async () => {
+      await test.step("ボードを開き Open 列のカードを確認する", async () => {
         await page.goto("/board");
         await expect(openCard).toBeVisible();
         await snap(page, testInfo, "ドラッグ前");
       });
 
-      await test.step("drag the card and see the error, card stays put", async () => {
+      await test.step("カードをドラッグしてエラー表示とカードが動かないことを確認する", async () => {
         await page.dragAndDrop(
           `[data-testid="kanban-column-open"] [data-testid="kanban-card"]:has-text("${subject}")`,
           `[data-testid="kanban-column-in_progress"]`,
@@ -176,11 +176,11 @@ test.describe("kanban board @feature-kanban", () => {
         },
       },
       async ({ page }, testInfo) => {
-        await test.step("navigate directly to the board as a customer", async () => {
+        await test.step("顧客としてボードへ直接アクセスする", async () => {
           await page.goto("/board");
         });
 
-        await test.step("see the forbidden panel, not the columns", async () => {
+        await test.step("列ではなく閲覧不可パネルが出ることを確認する", async () => {
           await expect(page.getByTestId("board-forbidden")).toBeVisible();
           // 反証固定(@pinned 相当): Board ナビリンクは agent 専用 — customer には出ない
           await expect(page.getByTestId("nav-board")).toHaveCount(0);

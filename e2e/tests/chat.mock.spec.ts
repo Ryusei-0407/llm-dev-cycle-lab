@@ -27,12 +27,12 @@ test.describe("chat with mocked API @feature-chat", () => {
         });
       });
 
-      await test.step("load the app", async () => {
+      await test.step("アプリを読み込む", async () => {
         await page.goto("/");
         await snap(page, testInfo, "初期表示");
       });
 
-      await test.step("send a message", async () => {
+      await test.step("メッセージを送信する", async () => {
         await page.getByLabel("Message").fill("Hello");
         await page.getByRole("button", { name: "Send" }).click();
         await expect(page.getByTestId("message-user")).toContainText("Hello");
@@ -40,7 +40,7 @@ test.describe("chat with mocked API @feature-chat", () => {
         await snap(page, testInfo, "ストリーミング中");
       });
 
-      await test.step("receive the streamed reply", async () => {
+      await test.step("ストリーミング応答を受信する", async () => {
         await expect(page.getByTestId("typing-indicator")).toBeHidden();
         await expect(page.getByTestId("message-assistant")).toContainText("Hello from the mock!");
         await expect(page.getByTestId("error-banner")).toBeHidden();
@@ -78,17 +78,17 @@ test.describe("chat with mocked API @feature-chat", () => {
         }),
       );
 
-      await test.step("load the app", async () => {
+      await test.step("アプリを読み込む", async () => {
         await page.goto("/");
         await snap(page, testInfo, "初期表示");
       });
 
-      await test.step("send a message that fails", async () => {
+      await test.step("失敗するメッセージを送信する", async () => {
         await page.getByLabel("Message").fill("Hello");
         await page.getByRole("button", { name: "Send" }).click();
       });
 
-      await test.step("see the error and recover", async () => {
+      await test.step("エラー表示と再送可能な状態を確認する", async () => {
         await expect(page.getByTestId("error-banner")).toBeVisible();
         await expect(page.getByTestId("message-assistant")).toHaveCount(0);
         // The user can immediately try again.
@@ -129,20 +129,20 @@ test.describe("chat with mocked API @feature-chat", () => {
           .catch(() => {}); // request may already be aborted
       });
 
-      await test.step("load the app", async () => {
+      await test.step("アプリを読み込む", async () => {
         await page.goto("/");
         await snap(page, testInfo, "初期表示");
         await expect(page.getByRole("button", { name: "Stop" })).toBeHidden();
       });
 
-      await test.step("start streaming", async () => {
+      await test.step("ストリーミングを開始する", async () => {
         await page.getByLabel("Message").fill("Hello");
         await page.getByRole("button", { name: "Send" }).click();
         await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
         await snap(page, testInfo, "ストリーミング中(Stopボタン表示)");
       });
 
-      await test.step("stop the stream", async () => {
+      await test.step("ストリーミングを停止する", async () => {
         await page.getByRole("button", { name: "Stop" }).click();
         // Must settle well before the 4s fulfil would end the stream anyway.
         await expect(page.getByTestId("typing-indicator")).toBeHidden({
@@ -175,12 +175,12 @@ test.describe("chat with mocked API @feature-chat", () => {
         }),
       );
 
-      await test.step("load the app", async () => {
+      await test.step("アプリを読み込む", async () => {
         await page.goto("/");
         await snap(page, testInfo, "初期表示");
       });
 
-      await test.step("stream fails mid-way", async () => {
+      await test.step("ストリーミングを途中で失敗させる", async () => {
         await page.getByLabel("Message").fill("Hello");
         await page.getByRole("button", { name: "Send" }).click();
         await expect(page.getByTestId("message-assistant")).toContainText("Partial");

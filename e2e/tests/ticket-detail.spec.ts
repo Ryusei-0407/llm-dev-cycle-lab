@@ -18,7 +18,7 @@ test.describe("ticket-detail over oRPC @feature-ticket-detail", () => {
       },
     },
     async ({ page }, testInfo) => {
-      await test.step("open the ticket from the list", async () => {
+      await test.step("一覧からチケットを開く", async () => {
         await page.goto("/tickets");
         await page
           .getByTestId("ticket-link")
@@ -28,13 +28,13 @@ test.describe("ticket-detail over oRPC @feature-ticket-detail", () => {
         await snap(page, testInfo, "詳細表示");
       });
 
-      await test.step("read the seeded thread", async () => {
+      await test.step("シードされたスレッドを読む", async () => {
         // 相対比較: 件数の絶対値ではなく「シード2件から返信で1件増える」ことを見る。
         await expect(page.getByTestId("message-item")).toHaveCount(2);
         await snap(page, testInfo, "スレッド");
       });
 
-      await test.step("post a reply", async () => {
+      await test.step("返信を投稿する", async () => {
         const before = await page.getByTestId("message-item").count();
         await page.getByLabel("Reply").fill("Thanks — I've reset your session, please retry.");
         await page.getByRole("button", { name: "Send reply" }).click();
@@ -71,11 +71,11 @@ test.describe("ticket-detail over oRPC @feature-ticket-detail", () => {
       },
     },
     async ({ page }, testInfo) => {
-      await test.step("navigate directly to a missing ticket", async () => {
+      await test.step("存在しないチケットへ直接アクセスする", async () => {
         await page.goto("/tickets/00000000-0000-7000-8000-0000000000ff");
       });
 
-      await test.step("see the not-found panel", async () => {
+      await test.step("見つからないパネルを確認する", async () => {
         await expect(page.getByTestId("ticket-not-found")).toBeVisible();
         await expect(page.getByTestId("message-thread")).toBeHidden();
         await snap(page, testInfo, "不在チケット");
@@ -94,7 +94,7 @@ test.describe("ticket-detail over oRPC @feature-ticket-detail", () => {
     },
     async ({ page }, testInfo) => {
       let before = 0;
-      await test.step("open a ticket", async () => {
+      await test.step("チケットを開く", async () => {
         await page.goto("/tickets");
         await page.getByTestId("ticket-link").filter({ hasText: "Billing question" }).click();
         await expect(page.getByTestId("message-item").first()).toBeVisible();
@@ -103,11 +103,11 @@ test.describe("ticket-detail over oRPC @feature-ticket-detail", () => {
         await snap(page, testInfo, "詳細表示");
       });
 
-      await test.step("submit an empty reply", async () => {
+      await test.step("空の返信を送信する", async () => {
         await page.getByRole("button", { name: "Send reply" }).click();
       });
 
-      await test.step("see the reply error with the thread unchanged", async () => {
+      await test.step("返信エラー表示とスレッドが不変なことを確認する", async () => {
         await expect(page.getByTestId("reply-error")).toBeVisible();
         await expect(page.getByTestId("message-item")).toHaveCount(before);
         await snap(page, testInfo, "返信エラー");

@@ -22,19 +22,19 @@ test.describe("reply-draft against the real backend @feature-reply-draft @backen
       },
     },
     async ({ page }, testInfo) => {
-      await test.step("open the ticket", async () => {
+      await test.step("チケットを開く", async () => {
         await page.goto("/tickets");
         await page.getByTestId("ticket-link").filter({ hasText: DRAFT_SUBJECT }).click();
         await expect(page.getByTestId("ticket-subject")).toContainText(DRAFT_SUBJECT);
         await snap(page, testInfo, "詳細表示");
       });
 
-      await test.step("request a draft", async () => {
+      await test.step("ドラフト生成を要求する", async () => {
         await page.getByTestId("generate-draft").click();
         await snap(page, testInfo, "ドラフト生成中");
       });
 
-      await test.step("receive a non-empty draft", async () => {
+      await test.step("空でないドラフトを受信する", async () => {
         await expect(page.getByTestId("draft-streaming")).toBeHidden({ timeout: 30_000 });
         await expect(page.getByTestId("draft-panel")).not.toBeEmpty();
         await expect(page.getByTestId("draft-error")).toBeHidden();

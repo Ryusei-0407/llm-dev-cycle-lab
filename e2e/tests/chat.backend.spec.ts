@@ -15,19 +15,19 @@ test.describe("chat against the real backend @backend @feature-chat", () => {
       },
     },
     async ({ page }, testInfo) => {
-      await test.step("load the app", async () => {
+      await test.step("アプリを読み込む", async () => {
         await page.goto("/");
         await snap(page, testInfo, "初期表示");
       });
 
-      await test.step("send a message", async () => {
+      await test.step("メッセージを送信する", async () => {
         await page.getByLabel("Message").fill("Hello backend");
         await page.getByRole("button", { name: "Send" }).click();
         await expect(page.getByTestId("typing-indicator")).toBeVisible();
         await snap(page, testInfo, "ストリーミング中");
       });
 
-      await test.step("receive a reply", async () => {
+      await test.step("応答を受信する", async () => {
         await expect(page.getByTestId("typing-indicator")).toBeHidden({
           timeout: 30_000,
         });
@@ -56,12 +56,12 @@ test.describe("chat against the real backend @backend @feature-chat", () => {
       },
     },
     async ({ page }, testInfo) => {
-      await test.step("load the app", async () => {
+      await test.step("アプリを読み込む", async () => {
         await page.goto("/");
         await snap(page, testInfo, "初期表示");
       });
 
-      await test.step("trigger a provider failure", async () => {
+      await test.step("プロバイダ失敗を発生させる", async () => {
         await page.getByLabel("Message").fill("__error__");
         await page.getByRole("button", { name: "Send" }).click();
         await expect(page.getByTestId("error-banner")).toBeVisible();
