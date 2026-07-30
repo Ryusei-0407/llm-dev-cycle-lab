@@ -62,7 +62,8 @@ for (const file of allSpecFiles) {
 
 // Rule 3: every describe must carry a @feature-<name> tag.
 // Rule 4: mock-lane E2E per feature: at most 3 tests (happy 1 + failure 2).
-//         @pinned (refutation-pinned), @backend, @component are exempt.
+//         @pinned (refutation-pinned), @backend, @component, @visual are exempt
+//         (VRT は1テスト=1画面撮影で、画面数がテスト数を決める).
 // Rule 5: files with a @smoke test must pin the final structure (aria snapshot).
 // Rule 6: e2e/tests specs use test.step + snap (narrative traces + staged shots).
 const featureCounts = new Map();
@@ -85,7 +86,7 @@ for (const file of allSpecFiles) {
     );
   }
 
-  const isMockLane = !/@backend|@component/.test(describeTitle);
+  const isMockLane = !/@backend|@component|@visual/.test(describeTitle);
   const tests = [...source.matchAll(/^\s*test\(\s*["'`]([^"'`]+)["'`]/gm)];
   if (feature && isMockLane) {
     const counted = tests.filter((t) => !/@pinned/.test(t[1])).length;
@@ -103,7 +104,8 @@ for (const file of allSpecFiles) {
     if (!source.includes("test.step(")) {
       report(file, 1, "test-step", "E2E はフェーズを test.step で構造化する");
     }
-    if (!source.includes("snap(")) {
+    // @visual(VRT)は toHaveScreenshot の撮影自体が成果物なので snap 不要。
+    if (!source.includes("snap(") && !/@visual/.test(describeTitle)) {
       report(file, 1, "staged-snap", "状態遷移ごとの snap()(段階スクショ)が必要");
     }
   }

@@ -40,6 +40,11 @@ Tailwind v4 + shadcn/Base UI)、`e2e` = Playwright。
   `src/routeTree.gen.ts` に自動生成される(`vp dev` / `vp build` の router-plugin が生成)。
   コミット対象だが自動生成物なので `.prettierignore` で整形対象外(lint/型はファイル先頭の
   `@ts-nocheck` で除外)。ルート追加時は dev/build を一度回して再生成すること
+- VRT(visual.spec.ts)の baseline は **linux(CI)でのみ生成・比較**。ローカルは
+  `ignoreSnapshots` で比較スキップ(darwin はフォント差で必ずずれる)。意図した UI 変更で
+  baseline を更新するときは `gh workflow run update-snapshots.yml --ref <branch>`(再生成
+  コミットがブランチに積まれ、PR の Files タブが新旧画像ビューアになる)。VRT の表示データは
+  page.route で固定してあり、DBの状態に依存しない
 - shadcn は Base UI ベース(components.json の `style: base-nova`)。コンポーネント追加は
   `apps/web` を cwd にして `pnpm dlx shadcn@latest add <name>`。テーマは `src/styles.css` の
   `:root, .dark`(docs/APP_DESIGN.md 由来)。ダーク固定(`index.html` の `<html class="dark">`)

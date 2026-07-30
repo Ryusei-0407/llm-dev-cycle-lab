@@ -252,7 +252,7 @@ try {
 }
 
 for (const test of tests) {
-  test.media = { screenshots: [], gifs: [] };
+  test.media = { screenshots: [], gifs: [], visuals: [] };
   // Unrelated passing tests are listed by name only, so skip their (expensive)
   // gif conversion and keep them off the ci-media branch.
   if (!wantsMedia(test)) continue;
@@ -263,8 +263,27 @@ for (const test of tests) {
     (a) => a.name === "screenshot" || a.name.startsWith("stage: "),
   );
   const videos = test.attachments.filter((a) => a.name === "video");
-  if (screenshots.length === 0 && videos.length === 0) continue;
+  // toHaveScreenshot の失敗添付(<shot>-expected/-actual/-diff.png)を3枚組に
+  // まとめる。VRT の差分を「期待/実際/差分」で並べて見せる一次データ。
+  const visualTriplets = new Map();
+  for (const a of test.attachments) {
+    const m = a.name.match(/^(.+)-(expected|actual|diff)\.png$/);
+    if (!m) continue;
+    if (!visualTriplets.has(m[1])) visualTriplets.set(m[1], {});
+    visualTriplets.get(m[1])[m[2]] = a;
+  }
+  if (screenshots.length === 0 && videos.length === 0 && visualTriplets.size === 0) continue;
   mkdirSync(dir, { recursive: true });
+  for (const [shot, parts] of visualTriplets) {
+    const visual = { label: shot };
+    for (const kind of ["expected", "actual", "diff"]) {
+      if (!parts[kind]) continue;
+      const file = path.join(dir, `visual-${slug(shot)}-${kind}.png`);
+      cpSync(parts[kind].path, file);
+      visual[kind] = file;
+    }
+    test.media.visuals.push(visual);
+  }
   screenshots.forEach((a, i) => {
     const file = path.join(dir, `screenshot-${i + 1}${path.extname(a.path) || ".png"}`);
     cpSync(a.path, file);
@@ -424,7 +443,7 @@ function buildComment() {
           md += `**${describe}**\n\n`;
           lastDescribe = describe;
         }
-        const media = test.media ?? { screenshots: [], gifs: [] };
+        const media = test.media ?? { screenshots: [], gifs: [], visuals: [] };
         const tags = [...new Set(test.title.match(/@[\w-]+/g) ?? [])];
         const tagBadges = tags.map((t) => `<code>${t}</code>`).join(" ");
         const descLine = test.description ? `<br>📝 ${test.description}` : "";
@@ -435,7 +454,22 @@ function buildComment() {
           for (const line of excerpt.split("\n")) md += `> ${line}\n`;
           md += `\n`;
         }
-        if (media.screenshots.length === 0 && media.gifs.length === 0) {
+        // VRT の差分は「期待 / 実際 / 差分」を横並びで最初に見せる — UI 変更の
+        // 成果物レビューはこの3枚組が本体で、録画・段階スクショは補助。
+        if ((media.visuals ?? []).length > 0) {
+          md += `#### 🎨 ビジュアル差分(期待 / 実際 / 差分)\n\n`;
+          for (const visual of media.visuals) {
+            const cell = (file) => (file ? `![](${blobBase}/${toRepoPath(file)}?raw=true)` : "—");
+            md += `**${visual.label}**\n\n`;
+            md += `| 期待(baseline) | 実際 | 差分 |\n|---|---|---|\n`;
+            md += `| ${cell(visual.expected)} | ${cell(visual.actual)} | ${cell(visual.diff)} |\n\n`;
+          }
+        }
+        if (
+          media.screenshots.length === 0 &&
+          media.gifs.length === 0 &&
+          (media.visuals ?? []).length === 0
+        ) {
           md += `_このテストのメディアはありません_\n`;
         }
         for (const gif of media.gifs) {
