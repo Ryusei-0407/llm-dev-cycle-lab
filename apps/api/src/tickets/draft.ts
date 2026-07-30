@@ -191,6 +191,9 @@ export function createDraftRouter(deps: DraftDeps) {
     // usage in the oRPC context injection; distinct from a bad body).
     const user = deps.resolveUser(c);
     if (!user) return c.json({ error: "unauthenticated" }, 401);
+    // draft is an agent-only tool (specs/authz.md): a customer is 403 forbidden,
+    // never starts a stream.
+    if (user.role !== "agent") return c.json({ error: "forbidden" }, 403);
 
     let body: unknown;
     try {

@@ -56,11 +56,19 @@ const COLUMNS = "id, subject, status, priority, requester_email, created_at";
 // Deterministic order: created_at DESC, then id DESC to break ties (seeds share
 // no timestamp, but created rows land at now() and could collide).
 const LIST_SQL = `SELECT ${COLUMNS} FROM tickets ORDER BY created_at DESC, id DESC`;
+const LIST_BY_REQUESTER_SQL = `SELECT ${COLUMNS} FROM tickets WHERE requester_email = $1 ORDER BY created_at DESC, id DESC`;
+
+// Optional filter for role-scoped listing (specs/authz.md): a customer sees only
+// their own tickets. The router owns the authorization decision; the store just
+// applies the requesterEmail filter when asked. Existing no-arg calls are unchanged.
+export type ListFilter = { requesterEmail?: string };
 
 export function createTicketStore(pool: Pool) {
   return {
-    async list(): Promise<Ticket[]> {
-      const { rows } = await pool.query<Row>(LIST_SQL);
+    async list(filter?: ListFilter): Promise<Ticket[]> {
+      const { rows } = filter?.requesterEmail
+        ? await pool.query<Row>(LIST_BY_REQUESTER_SQL, [filter.requesterEmail])
+        : await pool.query<Row>(LIST_SQL);
       return rows.map(toTicket);
     },
 
