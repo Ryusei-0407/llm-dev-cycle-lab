@@ -48,5 +48,12 @@
     "apps/web/src/routes/tickets_.$id.tsx",
     "apps/web/src/components/ticket-list.tsx",
     "apps/web/src/routes/__root.tsx"
+  ],
+  "ws-realtime": [
+    "apps/api/src/realtime.ts",
+    "apps/api/src/app.ts",
+    "apps/api/src/tickets/router.ts",
+    "apps/web/src/lib/realtime.ts",
+    "apps/web/src/routes/__root.tsx"
   ]
 }
