@@ -50,25 +50,25 @@ test.describe("reply-draft with mocked API @feature-reply-draft", () => {
         });
       });
 
-      await test.step("open the ticket from the list", async () => {
+      await test.step("一覧からチケットを開く", async () => {
         await openLoginTicket(page);
         await snap(page, testInfo, "詳細表示");
       });
 
-      await test.step("request a draft", async () => {
+      await test.step("ドラフト生成を要求する", async () => {
         await page.getByTestId("generate-draft").click();
         await expect(page.getByTestId("draft-streaming")).toBeVisible();
         await snap(page, testInfo, "ドラフト生成中");
       });
 
-      await test.step("see the streamed draft", async () => {
+      await test.step("ストリーミングされるドラフトを確認する", async () => {
         await expect(page.getByTestId("draft-streaming")).toBeHidden();
         await expect(page.getByTestId("draft-panel")).toContainText(DRAFT_TEXT);
         await expect(page.getByTestId("draft-error")).toBeHidden();
         await snap(page, testInfo, "ドラフト表示");
       });
 
-      await test.step("use the draft", async () => {
+      await test.step("ドラフトを返信欄に反映する", async () => {
         await page.getByTestId("use-draft").click();
         await expect(page.getByLabel("Reply")).toHaveValue(DRAFT_TEXT);
         await snap(page, testInfo, "返信欄へ転写");
@@ -100,16 +100,16 @@ test.describe("reply-draft with mocked API @feature-reply-draft", () => {
         }),
       );
 
-      await test.step("open the ticket", async () => {
+      await test.step("チケットを開く", async () => {
         await openLoginTicket(page);
         await snap(page, testInfo, "詳細表示");
       });
 
-      await test.step("request a draft that fails", async () => {
+      await test.step("失敗するドラフト生成を要求する", async () => {
         await page.getByTestId("generate-draft").click();
       });
 
-      await test.step("see the draft error", async () => {
+      await test.step("ドラフトのエラー表示を確認する", async () => {
         await expect(page.getByTestId("draft-error")).toBeVisible();
         // The reply was never populated, so the agent can still write manually.
         await expect(page.getByLabel("Reply")).toHaveValue("");
@@ -137,12 +137,12 @@ test.describe("reply-draft with mocked API @feature-reply-draft", () => {
         }),
       );
 
-      await test.step("open the ticket", async () => {
+      await test.step("チケットを開く", async () => {
         await openLoginTicket(page);
         await snap(page, testInfo, "詳細表示");
       });
 
-      await test.step("stream fails mid-way", async () => {
+      await test.step("ストリーミングを途中で失敗させる", async () => {
         await page.getByTestId("generate-draft").click();
         await expect(page.getByTestId("draft-panel")).toContainText(partial);
         await expect(page.getByTestId("draft-error")).toBeVisible();

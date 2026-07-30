@@ -244,7 +244,8 @@ for (const test of tests) {
           "-i",
           a.path,
           "-vf",
-          "fps=10,scale=1280:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+          // setpts=2.0 で再生速度を 0.5 倍に(テスト実行は等速のまま、閲覧だけスロー)
+          "setpts=2.0*PTS,fps=10,scale=1280:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
           file,
         ]);
         test.media.gifs.push(file);

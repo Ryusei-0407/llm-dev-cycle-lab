@@ -20,18 +20,18 @@ test.describe("auth @feature-auth", () => {
       },
     },
     async ({ page }, testInfo) => {
-      await test.step("visit the login page", async () => {
+      await test.step("ログインページを開く", async () => {
         await page.goto("/login");
         await snap(page, testInfo, "ログイン画面");
       });
 
-      await test.step("submit valid agent credentials", async () => {
+      await test.step("正しい担当者の資格情報を送信する", async () => {
         await page.getByLabel("Email").fill(SEED_USERS.agent.email);
         await page.getByLabel("Password").fill(SEED_USERS.agent.password);
         await page.getByRole("button", { name: "Sign in" }).click();
       });
 
-      await test.step("land on the protected home with the user shown", async () => {
+      await test.step("ユーザー名が表示されたホームに到達する", async () => {
         await expect(page).toHaveURL("/");
         await expect(page.getByTestId("current-user")).toHaveText(SEED_USERS.agent.name);
         await expect(page.getByTestId("login-error")).toBeHidden();
@@ -56,18 +56,18 @@ test.describe("auth @feature-auth", () => {
       },
     },
     async ({ page }, testInfo) => {
-      await test.step("visit the login page", async () => {
+      await test.step("ログインページを開く", async () => {
         await page.goto("/login");
         await snap(page, testInfo, "ログイン画面");
       });
 
-      await test.step("submit a wrong password", async () => {
+      await test.step("誤ったパスワードを送信する", async () => {
         await page.getByLabel("Email").fill(SEED_USERS.agent.email);
         await page.getByLabel("Password").fill("wrong-pass");
         await page.getByRole("button", { name: "Sign in" }).click();
       });
 
-      await test.step("see the error and remain unauthenticated", async () => {
+      await test.step("エラー表示と未ログインのままであることを確認する", async () => {
         await expect(page.getByTestId("login-error")).toBeVisible();
         await expect(page).toHaveURL("/login");
         await snap(page, testInfo, "認証失敗");
@@ -85,11 +85,11 @@ test.describe("auth @feature-auth", () => {
       },
     },
     async ({ page }, testInfo) => {
-      await test.step("hit the protected home directly", async () => {
+      await test.step("保護されたホームへ直接アクセスする", async () => {
         await page.goto("/");
       });
 
-      await test.step("get redirected to the login page", async () => {
+      await test.step("ログインページへリダイレクトされる", async () => {
         await expect(page).toHaveURL("/login");
         await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
         await snap(page, testInfo, "ガードでリダイレクト");
