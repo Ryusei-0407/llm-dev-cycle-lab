@@ -1,8 +1,9 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { FormEvent, useState } from "react";
-import { login } from "@/auth/api";
+import { login, passkeyLogin } from "@/auth/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supportsPasskeys } from "@/lib/webauthn";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -15,6 +16,12 @@ function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const enterApp = async () => {
+    // Re-run the guard so the now-valid session is seen, then land on /.
+    await router.invalidate();
+    await router.navigate({ to: "/" });
+  };
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (submitting) return;
@@ -22,12 +29,23 @@ function LoginPage() {
     setError(null);
     const result = await login(email, password);
     if (result.ok) {
-      // Re-run the guard so the now-valid session is seen, then land on /.
-      await router.invalidate();
-      await router.navigate({ to: "/" });
+      await enterApp();
       return;
     }
     setError("メールアドレスまたはパスワードが正しくありません");
+    setSubmitting(false);
+  };
+
+  const onPasskeyLogin = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    const result = await passkeyLogin();
+    if (result.ok) {
+      await enterApp();
+      return;
+    }
+    setError("パスキーでのログインに失敗しました");
     setSubmitting(false);
   };
 
@@ -69,6 +87,17 @@ function LoginPage() {
           <Button type="submit" disabled={submitting}>
             Sign in
           </Button>
+          {supportsPasskeys() && (
+            <Button
+              type="button"
+              variant="secondary"
+              data-testid="passkey-login"
+              disabled={submitting}
+              onClick={onPasskeyLogin}
+            >
+              パスキーでログイン
+            </Button>
+          )}
         </form>
       </div>
     </main>

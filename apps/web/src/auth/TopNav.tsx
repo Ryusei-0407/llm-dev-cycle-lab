@@ -1,7 +1,9 @@
 import { Link, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useRealtimeInvalidation } from "@/lib/realtime";
-import { logout, type User } from "./api";
+import { supportsPasskeys } from "@/lib/webauthn";
+import { logout, registerPasskey, type User } from "./api";
 
 // Signed-in shell header (top-nav) per specs/auth.md: shows the current user
 // and a Sign out control. Sign out clears the session then sends the user back
@@ -13,11 +15,16 @@ import { logout, type User } from "./api";
 export function TopNav({ user }: { user: User }) {
   const router = useRouter();
   useRealtimeInvalidation();
+  const [passkeyState, setPasskeyState] = useState<"idle" | "registered" | "error">("idle");
 
   const onSignOut = async () => {
     await logout();
     await router.invalidate();
     await router.navigate({ to: "/login" });
+  };
+
+  const onRegisterPasskey = async () => {
+    setPasskeyState((await registerPasskey()) ? "registered" : "error");
   };
 
   return (
@@ -50,6 +57,26 @@ export function TopNav({ user }: { user: User }) {
         <span data-testid="current-user" className="text-sm text-muted-foreground">
           {user.name}
         </span>
+        {supportsPasskeys() &&
+          (passkeyState === "registered" ? (
+            <span data-testid="passkey-registered" className="text-sm text-muted-foreground">
+              パスキーを登録しました
+            </span>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              data-testid="passkey-register"
+              onClick={onRegisterPasskey}
+            >
+              パスキーを登録
+            </Button>
+          ))}
+        {passkeyState === "error" && (
+          <span data-testid="passkey-error" className="text-sm text-destructive">
+            登録に失敗しました
+          </span>
+        )}
         <Button variant="secondary" size="sm" onClick={onSignOut}>
           Sign out
         </Button>
