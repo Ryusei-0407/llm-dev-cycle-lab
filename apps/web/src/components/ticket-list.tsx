@@ -11,9 +11,14 @@ const STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [
 export function TicketList({
   tickets,
   onStatusChange,
+  showStatusControl = true,
 }: {
   tickets: Ticket[];
   onStatusChange: (id: string, status: TicketStatus) => void;
+  // Status change is an agent-only control; a customer session hides it
+  // (specs/customer-portal.md). Defaults to shown so the component keeps its
+  // agent behavior wherever the flag isn't passed.
+  showStatusControl?: boolean;
 }) {
   return (
     <ul data-testid="ticket-list" className="flex flex-col gap-2">
@@ -37,18 +42,21 @@ export function TicketList({
           </Link>
           <StatusBadge status={ticket.status} />
           <span className="text-xs text-ink-subtle capitalize">{ticket.priority}</span>
-          <select
-            aria-label={`Status for ${ticket.subject}`}
-            value={ticket.status}
-            onChange={(e) => onStatusChange(ticket.id, e.target.value as TicketStatus)}
-            className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          {showStatusControl && (
+            <select
+              data-testid="ticket-status-select"
+              aria-label={`Status for ${ticket.subject}`}
+              value={ticket.status}
+              onChange={(e) => onStatusChange(ticket.id, e.target.value as TicketStatus)}
+              className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          )}
         </li>
       ))}
     </ul>

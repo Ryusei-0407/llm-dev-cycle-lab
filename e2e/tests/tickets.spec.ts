@@ -17,7 +17,15 @@ test.describe("tickets over tRPC @feature-tickets", () => {
     async ({ page }, testInfo) => {
       await test.step("load the tickets page", async () => {
         await page.goto("/tickets");
-        await expect(page.getByTestId("ticket-row")).toHaveCount(3);
+        // シード3件の存在をアンカーで確認する。絶対件数は使わない: E2E ファイル群は
+        // 1つのDBを共有するため、他ファイルの create が並走すると行数は増えうる
+        for (const subject of [
+          "Cannot login to dashboard",
+          "Billing question",
+          "Feature request: dark mode",
+        ]) {
+          await expect(page.getByTestId("ticket-row").filter({ hasText: subject })).toBeVisible();
+        }
         await snap(page, testInfo, "初期表示");
       });
 
@@ -30,8 +38,11 @@ test.describe("tickets over tRPC @feature-tickets", () => {
       await test.step("submit a new ticket", async () => {
         await page.getByLabel("Subject").fill("Printer on fire");
         await page.getByRole("button", { name: "Create" }).click();
-        await expect(page.getByTestId("ticket-row")).toHaveCount(4);
-        await expect(page.getByTestId("ticket-row").first()).toContainText("Printer on fire");
+        // 絶対件数・先頭位置は使わない(共有DBに並走 create が乗りうるため)。
+        // 「作成した行が現れ、エラーが無い」ことが本質
+        await expect(
+          page.getByTestId("ticket-row").filter({ hasText: "Printer on fire" }),
+        ).toBeVisible();
         await expect(page.getByTestId("ticket-error")).toBeHidden();
         await snap(page, testInfo, "作成後");
       });

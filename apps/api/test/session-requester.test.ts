@@ -155,20 +155,19 @@ describe("session-requester (HTTP面) @feature-tickets", () => {
   );
 
   it(
-    "cookie 無しの list は従来どおり成功しシード3件を返す(M2 では create のみ必須)",
+    "cookie 無しの list は oRPC UNAUTHORIZED(HTTP 401)で拒否される",
     {
       annotation: {
         type: "description",
         description:
-          "M2 では list に認可を付けないため、cookie 無しの list が 200 でシード3件を返すことを検証",
+          "M3(authz)で list も認可必須になったため、cookie 無しの list が HTTP 401 + oRPC エラー code UNAUTHORIZED で拒否されることを検証(specs/authz.md 裁定済みの仕様変更追随)",
       },
     },
     async () => {
       const res = await rpcList(createApp());
-      expect(res.status).toBe(200);
-      const list = unwrap(await res.json()) as unknown[];
-      expect(Array.isArray(list)).toBe(true);
-      expect(list).toHaveLength(3);
+      expect(res.status).toBe(401);
+      const err = unwrap(await res.json()) as { code?: string };
+      expect(err.code).toBe("UNAUTHORIZED");
     },
   );
 });

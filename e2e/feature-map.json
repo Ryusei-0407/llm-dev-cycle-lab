@@ -41,5 +41,12 @@
     "apps/api/src/llm/**",
     "apps/web/src/components/draft-panel.tsx",
     "apps/web/src/routes/tickets_.$id.tsx"
+  ],
+  "customer-portal": [
+    "apps/web/src/lib/session.ts",
+    "apps/web/src/routes/tickets.tsx",
+    "apps/web/src/routes/tickets_.$id.tsx",
+    "apps/web/src/components/ticket-list.tsx",
+    "apps/web/src/routes/__root.tsx"
   ]
 }
