@@ -41,14 +41,15 @@ test.describe("ws-realtime over WebSocket @feature-ws-realtime", () => {
       const subject = `WS live: ${test.info().testId} tape drive rewinding`;
 
       await test.step("open the tickets list and wait for the live socket", async () => {
-        await page.goto("/tickets");
-        await expect(page.getByTestId("ticket-row").first()).toBeVisible();
         // 自動更新の前提となる /api/ws 接続が確立するのを待つ。固定待ちは使わず、
-        // WebSocket ハンドシェイクの成立をイベントで待つ(この接続が張れないと
-        // このテストは「reload 無し反映」を検証できない)。
-        await page.waitForEvent("websocket", {
+        // WebSocket ハンドシェイクの成立をイベントで待つ。接続はページロード中に
+        // 張られるため、リスナーは goto より先に登録する(後付けだと取り逃がす)
+        const liveSocket = page.waitForEvent("websocket", {
           predicate: (ws) => ws.url().includes("/api/ws"),
         });
+        await page.goto("/tickets");
+        await expect(page.getByTestId("ticket-row").first()).toBeVisible();
+        await liveSocket;
         await snap(page, testInfo, "初期表示");
       });
 
