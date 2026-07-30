@@ -28,6 +28,17 @@ export function TopNav({ user }: { user: User }) {
         >
           Tickets
         </Link>
+        {/* The board is an agent-only view (specs/kanban.md); a customer never
+            sees the link and is turned away at /board by board-forbidden. */}
+        {user.role === "agent" && (
+          <Link
+            data-testid="nav-board"
+            to="/board"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground [&.active]:text-foreground"
+          >
+            Board
+          </Link>
+        )}
       </div>
       <div className="flex items-center gap-3">
         <span data-testid="current-user" className="text-sm text-muted-foreground">
