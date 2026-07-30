@@ -406,7 +406,7 @@ function buildComment() {
       // (apps/api/src/app.ts) changed, not the chat feature itself.
       const trigger = byFile.get(fileTitle).find((t) => t.relationReason);
       if (scopingActive && trigger?.relationReason && trigger.relationFiles.length > 0) {
-        md += `<sub>🔍 ${trigger.relationReason}: ${trigger.relationFiles.map((f) => `\`${f}\``).join(", ")}</sub>\n\n`;
+        md += `> 🔍 **${trigger.relationReason}**: ${trigger.relationFiles.map((f) => `\`${f}\``).join(", ")}\n\n`;
       }
       let lastDescribe = null;
       for (const test of byFile.get(fileTitle)) {
