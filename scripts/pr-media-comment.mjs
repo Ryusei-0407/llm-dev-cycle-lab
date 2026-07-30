@@ -139,27 +139,42 @@ const featureMatchers = new Map(
   Object.entries(featureMap).map(([name, globs]) => [name, globs.map(globToRegExp)]),
 );
 
-function getChangedFiles() {
+// Returns the PR's changed files with their git status, or null when the set is
+// unknown (dry-run without injection). Dry-run injection accepts "path" (treated
+// as modified) or "path:added" to exercise the new-vs-existing split.
+function getChangedEntries() {
   if (changedFilesArg !== undefined) {
     return changedFilesArg
       .split(",")
-      .map((f) => f.trim())
-      .filter(Boolean);
+      .map((raw) => raw.trim())
+      .filter(Boolean)
+      .map((raw) => {
+        const [filename, status] = raw.split(":");
+        return { filename: filename.trim(), status: (status ?? "modified").trim() };
+      });
   }
-  if (DRY_RUN) return null; // unknown changed set in dry-run without injection
+  if (DRY_RUN) return null;
+  // {filename,status} per line — safe across --paginate pages, and avoids the
+  // multi-line `patch` field that would break line-based parsing.
   return sh("gh", [
     "api",
     `repos/${repo}/pulls/${prNumber}/files`,
     "--paginate",
     "--jq",
-    ".[].filename",
+    ".[] | {filename, status} | @json",
   ])
     .split("\n")
-    .map((f) => f.trim())
-    .filter(Boolean);
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
 }
 
-const changedFiles = getChangedFiles();
+const changedEntries = getChangedEntries();
+const changedFiles = changedEntries?.map((e) => e.filename) ?? null;
+// Spec files added (not modified) in this PR — their tests are new implementations.
+const addedFiles = new Set(
+  (changedEntries ?? []).filter((e) => e.status === "added").map((e) => e.filename),
+);
 // null = we could not determine the changed set (dry-run without injection).
 // Then scoping cannot apply, so every test is treated as related (old behavior).
 const scopingActive = changedFiles !== null;
@@ -178,7 +193,12 @@ function relationOf(test) {
     return { related: true, reason: "失敗", files: [] };
   }
   if (test.specFile && changedFiles.includes(test.specFile)) {
-    return { related: true, reason: "テスト自体を変更", files: [test.specFile] };
+    const added = addedFiles.has(test.specFile);
+    return {
+      related: true,
+      reason: added ? "新規追加" : "テスト自体を変更",
+      files: [test.specFile],
+    };
   }
   const feature = featureOf(test);
   if (!feature) return { related: false, reason: null, files: [] };
@@ -197,6 +217,10 @@ for (const test of tests) {
   test.related = rel.related;
   test.relationReason = rel.reason;
   test.relationFiles = rel.files;
+  // New = the test's spec file was added in this PR (the common shape of a new
+  // feature: a fresh spec file). Tests added into an existing file fall under
+  // "existing (related)" — acceptable, the file is already shown.
+  test.isNew = Boolean(test.specFile && addedFiles.has(test.specFile));
 }
 // Unrelated passing (non-flaky) tests are listed by name only — no media.
 const wantsMedia = (test) =>
@@ -425,9 +449,24 @@ function buildComment() {
     md += `## ❌ 失敗(${failedDetailed.length})\n\n`;
     renderTree(failedDetailed);
   }
-  if (passedDetailed.length > 0) {
-    md += `## ✅ 成功(${passedDetailed.length})\n\n`;
-    renderTree(passedDetailed);
+  // Passed related tests split by novelty: newly-implemented (this PR added the
+  // spec file) vs pre-existing (shown because a shared/related file changed).
+  const newPassed = passedDetailed.filter((t) => t.isNew);
+  const existingPassed = passedDetailed.filter((t) => !t.isNew);
+  if (scopingActive && newPassed.length > 0) {
+    md += `## 🆕 このPRで追加された機能のテスト(${newPassed.length})\n\n`;
+    renderTree(newPassed);
+  }
+  if (existingPassed.length > 0) {
+    const title =
+      scopingActive && newPassed.length > 0
+        ? `## ♻️ 既存テスト(このPRの変更に関連・${existingPassed.length})`
+        : `## ✅ 成功(${existingPassed.length})`;
+    md += `${title}\n\n`;
+    if (scopingActive && newPassed.length > 0) {
+      md += `<sub>これらは新機能そのものではなく、変更したファイルが波及するため表示されています(各見出しの 🔍 参照)。</sub>\n\n`;
+    }
+    renderTree(existingPassed);
   }
 
   if (collapsed.length > 0) {
