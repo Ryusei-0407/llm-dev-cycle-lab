@@ -169,21 +169,35 @@ function featureOf(test) {
   return test.title.match(/@feature-([\w-]+)/)?.[1];
 }
 
-function isRelated(test) {
-  if (!scopingActive) return true;
-  // (c) failures are always shown in full, regardless of scope.
-  if (test.status === "failed" || test.status === "unexpected") return true;
-  // (b) the test's own spec file was changed.
-  if (test.specFile && changedFiles.includes(test.specFile)) return true;
+// Returns why a test is in scope for this PR: the trigger and the changed
+// file(s) behind it, so shared-file matches (e.g. a schema/entry-point edit
+// pulling in an unrelated feature) are transparent rather than mysterious.
+function relationOf(test) {
+  if (!scopingActive) return { related: true, reason: null, files: [] };
+  if (test.status === "failed" || test.status === "unexpected") {
+    return { related: true, reason: "失敗", files: [] };
+  }
+  if (test.specFile && changedFiles.includes(test.specFile)) {
+    return { related: true, reason: "テスト自体を変更", files: [test.specFile] };
+  }
   const feature = featureOf(test);
-  if (!feature) return false;
-  // (a) a feature-map glob matched, or the feature's spec doc changed.
-  if (changedFiles.includes(`specs/${feature}.md`)) return true;
+  if (!feature) return { related: false, reason: null, files: [] };
+  if (changedFiles.includes(`specs/${feature}.md`)) {
+    return { related: true, reason: "仕様書を変更", files: [`specs/${feature}.md`] };
+  }
   const matchers = featureMatchers.get(feature) ?? [];
-  return changedFiles.some((f) => matchers.some((re) => re.test(f)));
+  const files = changedFiles.filter((f) => matchers.some((re) => re.test(f)));
+  return files.length > 0
+    ? { related: true, reason: "関連ファイルを変更", files }
+    : { related: false, reason: null, files: [] };
 }
 
-for (const test of tests) test.related = isRelated(test);
+for (const test of tests) {
+  const rel = relationOf(test);
+  test.related = rel.related;
+  test.relationReason = rel.reason;
+  test.relationFiles = rel.files;
+}
 // Unrelated passing (non-flaky) tests are listed by name only — no media.
 const wantsMedia = (test) =>
   test.related ||
@@ -340,7 +354,8 @@ function buildComment() {
   }
   if (scopingActive) {
     md += `各テストを開くと、実行全体の録画と、操作段階ごとのスクリーンショットが見られます。`;
-    md += `**メディアは変更関連のテストのみ表示**(失敗は関連に関わらず全表示)。\n\n`;
+    md += `**メディアは変更関連のテストのみ表示**(失敗は関連に関わらず全表示)。`;
+    md += `共有ファイル(APIのエントリやスキーマ等)を変更すると、それを参照する他機能も\`🔍 関連理由\`付きで表示されます。\n\n`;
   } else {
     md += `各テストを開くと、実行全体の録画と、操作段階ごとのスクリーンショットが見られます。\n\n`;
   }
@@ -362,6 +377,13 @@ function buildComment() {
     }
     for (const fileTitle of fileOrder) {
       md += `### 📄 ${displayFile(fileTitle)}\n\n`;
+      // Why this file is in scope: the file(s) whose change pulled it in. Lets
+      // a reader see, e.g., that chat shows only because a shared entry point
+      // (apps/api/src/app.ts) changed, not the chat feature itself.
+      const trigger = byFile.get(fileTitle).find((t) => t.relationReason);
+      if (scopingActive && trigger?.relationReason && trigger.relationFiles.length > 0) {
+        md += `<sub>🔍 ${trigger.relationReason}: ${trigger.relationFiles.map((f) => `\`${f}\``).join(", ")}</sub>\n\n`;
+      }
       let lastDescribe = null;
       for (const test of byFile.get(fileTitle)) {
         const describe = stripTags(test.describePath ?? "");
