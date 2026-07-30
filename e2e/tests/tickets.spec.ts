@@ -65,22 +65,22 @@ test.describe("tickets over tRPC @feature-tickets", () => {
   );
 
   test(
-    "shows a validation error and keeps the list unchanged for an empty subject",
+    "shows a validation error for an empty subject",
     {
       annotation: {
         type: "description",
         description:
-          "空の件名で作成を試みたときにバリデーションエラーが出て一覧の件数が変わらないことを検証",
+          "空の件名で作成を試みたときにバリデーションエラーが表示され、フォームが再入力可能なまま残ることを検証",
       },
     },
     async ({ page }, testInfo) => {
-      // 件数は絶対値でなく前後比較にする: ストアはEEラン全体で共有され、
-      // 他テストの作成分が混ざりうる(実行順・並列度に依存しない検証にする)
-      let before = 0;
+      // 件数の不変検証はここでは行わない: 一覧はWSライブ更新で他テストの並走
+      // create を随時取り込むため、before/after 比較は共有DB下で構造的に
+      // 成立しない。空件名がサーバーで拒否されること自体は unit(zod + DB
+      // CHECK 制約)が担保しており、E2E の責務はUIハンドリングに限定する
       await test.step("チケットページを読み込む", async () => {
         await page.goto("/tickets");
         await expect(page.getByTestId("ticket-row").first()).toBeVisible();
-        before = await page.getByTestId("ticket-row").count();
         await snap(page, testInfo, "初期表示");
       });
 
@@ -91,7 +91,8 @@ test.describe("tickets over tRPC @feature-tickets", () => {
 
       await test.step("バリデーションエラー表示を確認する", async () => {
         await expect(page.getByTestId("ticket-error")).toBeVisible();
-        await expect(page.getByTestId("ticket-row")).toHaveCount(before);
+        // 作成は成立せずフォームが開いたまま = ユーザーは修正して再送できる
+        await expect(page.getByLabel("Subject")).toBeVisible();
         await snap(page, testInfo, "バリデーションエラー");
       });
     },
