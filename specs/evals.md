@@ -95,13 +95,13 @@ export type CaseResult = {
   draft: string;
   checks: CheckResult[];
   verdict: JudgeVerdict | null; // judge 呼び出し自体が失敗したら null
-  error: string | null;         // 生成が失敗したケースはここに理由、checks は []
+  error: string | null; // 生成が失敗したケースはここに理由、checks は []
 };
 export type Summary = {
   total: number;
   programmaticFailures: number; // checks に 1 つでも pass=false があるケース数
-  rubricPassRate: number;       // verdict.score >= 4 のケース数 / verdict 非 null のケース数(0件なら 0)
-  pass: boolean;                // programmaticFailures === 0 && rubricPassRate >= 0.8 && error なし && verdict null なし
+  rubricPassRate: number; // verdict.score >= 4 のケース数 / verdict 非 null のケース数(0件なら 0)
+  pass: boolean; // programmaticFailures === 0 && rubricPassRate >= 0.8 && error なし && verdict null なし
 };
 ```
 
@@ -177,16 +177,16 @@ export function realJudge(client: GoogleGenAI, model: string): JudgeFn;
 すべて **apps/api のユニット層**(Vitest node)。実LLM実行の検証は nightly の
 evals ジョブ自体が担う(llm-smoke と同じ整理)。E2E 層は対象外。
 
-| # | MUST | 検証するテスト(委譲先まで明記) |
-|---|---|---|
-| 1 | loadCases が正しいケースを辞書順に読み、不正 JSON / スキーマ違反 / id 重複を file 名入りで throw | unit: cases.test.ts |
-| 2 | runProgrammaticChecks が length / must-mention / must-not-mention を仕様どおり判定(境界: ちょうど minChars・大文字小文字・欠落語 detail) | unit: scoring.test.ts |
-| 3 | parseJudgeVerdict が正常 JSON を通し、非JSON・score範囲外・フィールド欠落を "judge verdict" 入りで throw | unit: scoring.test.ts |
-| 4 | summarize の pass 判定(全緑 / programmatic 1落ち / rubricPassRate 境界 0.8 ちょうど / error あり / verdict null あり) | unit: scoring.test.ts |
-| 5 | buildJudgePrompt にルーブリック3項目・チケット文脈・ドラフト・JSON指示が全て入る | unit: judge.test.ts |
-| 6 | run.ts のオーケストレーション: 注入した fake 生成/judge で全ケースが CaseResult 化され、report JSON が書かれ、pass/fail が exit code に反映 | unit: run.test.ts(run.ts から export する `runEvals(deps)` を直接呼ぶ。CLI ラッパは薄く保つ) |
-| 7 | 生成 API エラーの 1 回リトライ(1回目 reject → 2回目 resolve で成功扱い、2連続 reject で CaseResult.error) | unit: run.test.ts |
-| 8 | 同梱ケース(cases/*.json)が loadCases を素通しし、6 件以上ある | unit: cases.test.ts |
+| #   | MUST                                                                                                                                        | 検証するテスト(委譲先まで明記)                                                               |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 1   | loadCases が正しいケースを辞書順に読み、不正 JSON / スキーマ違反 / id 重複を file 名入りで throw                                            | unit: cases.test.ts                                                                          |
+| 2   | runProgrammaticChecks が length / must-mention / must-not-mention を仕様どおり判定(境界: ちょうど minChars・大文字小文字・欠落語 detail)    | unit: scoring.test.ts                                                                        |
+| 3   | parseJudgeVerdict が正常 JSON を通し、非JSON・score範囲外・フィールド欠落を "judge verdict" 入りで throw                                    | unit: scoring.test.ts                                                                        |
+| 4   | summarize の pass 判定(全緑 / programmatic 1落ち / rubricPassRate 境界 0.8 ちょうど / error あり / verdict null あり)                       | unit: scoring.test.ts                                                                        |
+| 5   | buildJudgePrompt にルーブリック3項目・チケット文脈・ドラフト・JSON指示が全て入る                                                            | unit: judge.test.ts                                                                          |
+| 6   | run.ts のオーケストレーション: 注入した fake 生成/judge で全ケースが CaseResult 化され、report JSON が書かれ、pass/fail が exit code に反映 | unit: run.test.ts(run.ts から export する `runEvals(deps)` を直接呼ぶ。CLI ラッパは薄く保つ) |
+| 7   | 生成 API エラーの 1 回リトライ(1回目 reject → 2回目 resolve で成功扱い、2連続 reject で CaseResult.error)                                   | unit: run.test.ts                                                                            |
+| 8   | 同梱ケース(cases/*.json)が loadCases を素通しし、6 件以上ある                                                                               | unit: cases.test.ts                                                                          |
 
 実LLM の生成・judge 呼び出しコード(realJudge / 生成アダプタ)は unit では
 「呼び出しパラメータの組み立て」までを検証し、実挙動は nightly evals に委譲する。

@@ -1,0 +1,18 @@
+{
+  "id": "billing-dispute",
+  "ticket": {
+    "subject": "Charged twice on invoice INV-2093",
+    "status": "open",
+    "priority": "high",
+    "requesterEmail": "marco.silva@example.com"
+  },
+  "messages": [
+    {
+      "authorRole": "customer",
+      "authorEmail": "marco.silva@example.com",
+      "body": "My card statement shows two charges of $49.00 on July 12 for the same invoice INV-2093 (Pro plan, monthly). I only have one workspace. Please refund the duplicate charge of $49.00 to the original card."
+    }
+  ],
+  "mustMention": ["invoice"],
+  "mustNotMention": ["you are a support agent"]
+}
