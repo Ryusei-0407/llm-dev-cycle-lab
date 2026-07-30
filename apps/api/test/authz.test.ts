@@ -440,3 +440,48 @@ describe("authz: draft はエージェント専用 (HTTP面) @feature-authz", ()
     },
   );
 });
+
+describe("regression pins from M3 review @feature-ticket-detail", () => {
+  it(
+    "draft for a missing ticket is still forbidden for a customer",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "customer が不在チケットの draft を叩いても(判定順序に関わらず)403 forbidden になることを検証",
+      },
+    },
+    async () => {
+      const app = createApp();
+      const cookie = await cookieFor(app, SEED.customer);
+      const res = await draft(app, { ticketId: MISSING_TICKET }, cookie);
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: "forbidden" });
+    },
+  );
+
+  it(
+    "reply author is attributed to the session user, not a fixed value",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "customer セッションの reply が customer の email/role に帰属する(固定値へのすり替え回帰を検知)ことを検証",
+      },
+    },
+    async () => {
+      const app = createApp();
+      const cookie = await cookieFor(app, SEED.customer);
+      const res = await rpc(
+        app,
+        "reply",
+        { ticketId: CUSTOMER_TICKET, body: "Attribution check from the customer session." },
+        cookie,
+      );
+      expect(res.status).toBe(200);
+      const message = unwrap(await res.json()) as { authorEmail?: string; authorRole?: string };
+      expect(message.authorEmail).toBe(SEED.customer.email);
+      expect(message.authorRole).toBe("customer");
+    },
+  );
+});
