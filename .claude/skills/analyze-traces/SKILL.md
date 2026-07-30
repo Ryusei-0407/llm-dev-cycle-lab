@@ -36,5 +36,10 @@ trace-analyst サブエージェントを起動し、トレースのディレク
 ## 判断基準
 
 - アクション 500ms 以上、API リクエスト 500ms 以上を「遅い」の初期閾値とする(`--slow-ms=` で調整可)
+- バックエンド内訳はレポートの「API endpoints (Server-Timing backend breakdown)」を見る
+  (API が全 /api/* 応答に付与する `app;dur`/`db;dur` ヘッダ由来)。**db が支配的ならクエリ、
+  app と db の差が大きければアプリ処理(ハッシュ計算・シリアライズ等)が最適化対象**。
+  呼び出し回数(calls/queries)が多い行は、個別最適化より頻度制御(debounce/batch —
+  TanStack Pacer 等)が正解のことがある
 - console エラーは 0 が正常。警告は既知リストにないものだけ報告
 - 「何かを必ず見つける」必要はない。健全なら健全と報告して終了してよい
