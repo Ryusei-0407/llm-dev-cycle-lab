@@ -18,9 +18,22 @@ test.describe("customer-portal @feature-customer-portal", () => {
   // Path mirrors auth.setup.ts's output (e2e/.auth/<role>.json).
   test.use({ storageState: "e2e/.auth/customer.json" });
 
-  // The one seeded ticket a customer can open and reply to (all three seeds are
-  // customer-owned per apps/api/db/seed.sql; this one carries a thread).
-  const OWN_SUBJECT = "Cannot login to dashboard";
+  // The smoke flow replies on a ticket the test creates for itself over the
+  // API (as the customer session): replying on a shared seed would mutate the
+  // thread other spec files assert against — E2E files share one database per
+  // run, so every mutation must stay on test-owned rows.
+  const OWN_SUBJECT = "Portal smoke: printer makes clicking noises";
+
+  async function createOwnTicket(request: APIRequestContext, subject: string): Promise<string> {
+    const res = await request.post("/api/rpc/tickets/create", {
+      data: { json: { subject, priority: "low" } },
+    });
+    expect(res.ok(), `create expected 2xx, got ${res.status()}`).toBeTruthy();
+    const body = (await res.json()) as { json?: { id?: string }; id?: string };
+    const id = body.json?.id ?? body.id;
+    expect(id, "created ticket id").toBeTruthy();
+    return id!;
+  }
 
   // Creates a ticket owned by the *agent* (requesterEmail = agent@example.com)
   // over the oRPC wire, so the customer-side "someone else's ticket" cases have
@@ -50,7 +63,11 @@ test.describe("customer-portal @feature-customer-portal", () => {
           "顧客セッションで /tickets を開くと担当者向けの status 変更 select が無く、自分のチケット詳細には Generate draft が無い状態で返信でき、スレッド末尾に自分の返信が追加されるまでの主経路を検証",
       },
     },
-    async ({ page }, testInfo) => {
+    async ({ page, request }, testInfo) => {
+      await test.step("create a portal-owned ticket over the API", async () => {
+        await createOwnTicket(request, OWN_SUBJECT);
+      });
+
       await test.step("open the tickets list as a customer", async () => {
         await page.goto("/tickets");
         await expect(page.getByTestId("ticket-row").first()).toBeVisible();
@@ -93,8 +110,6 @@ test.describe("customer-portal @feature-customer-portal", () => {
       // reply control) — roles and order only, survives copy and layout changes.
       await expect(page.getByTestId("message-thread")).toMatchAriaSnapshot(`
       - list:
-        - listitem
-        - listitem
         - listitem
     `);
     },
