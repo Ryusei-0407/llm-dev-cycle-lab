@@ -47,8 +47,18 @@ export default defineConfig({
     // one per UI state change); the automatic one only fires on failure.
     // Explicit size: Playwright otherwise scales recordings down to fit
     // 800x800, which caps the gif resolution at 800px wide.
+    // show.actions は操作要素のハイライト + アクション字幕 + カーソル描画
+    // (v1.59 の公式スクリーンキャスト注釈)。テスト実行速度には影響しない —
+    // 「ゆっくり再生」は録画側でなく GIF 変換(setpts 0.5x)で行う
     video: process.env.CI
-      ? { mode: "on", size: { width: 1280, height: 720 } }
+      ? {
+          mode: "on" as const,
+          size: { width: 1280, height: 720 },
+          show: {
+            actions: { cursor: "pointer" as const, position: "top-left" as const, duration: 800 },
+            test: { level: "step" as const, position: "top-right" as const },
+          },
+        }
       : "retain-on-failure",
     screenshot: "only-on-failure",
   },
