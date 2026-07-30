@@ -5,6 +5,8 @@
 -- messages drops first: it references tickets, so it must go before the parent
 -- (DROP … CASCADE would work too, but explicit child-first keeps the intent).
 -- sessions references users, so it drops before users for the same reason.
+-- passkeys also references users, so it drops before users too.
+DROP TABLE IF EXISTS passkeys;
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS messages;
@@ -32,6 +34,21 @@ CREATE TABLE users (
 CREATE TABLE sessions (
   sid uuid PRIMARY KEY,
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- passkeys: WebAuthn credentials (spec: specs/passkey.md). One user may hold
+-- several passkeys, so only credential_id is UNIQUE (not user_id) — this also
+-- keeps E2E retries stable when a re-run registers a fresh key for the same
+-- seed user. ON DELETE CASCADE so removing a user takes their passkeys with it.
+-- credential_id / public_key are base64url text; counter guards against cloned
+-- authenticators (verifyAuthenticationResponse returns the next value).
+CREATE TABLE passkeys (
+  id uuid PRIMARY KEY DEFAULT uuidv7(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  credential_id text NOT NULL UNIQUE,
+  public_key text NOT NULL,
+  counter bigint NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
