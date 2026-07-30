@@ -22,6 +22,7 @@
 //
 // Env (CI mode): GH_TOKEN, PR_NUMBER, GITHUB_REPOSITORY, GITHUB_RUN_ID
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
@@ -171,6 +172,22 @@ function getChangedEntries() {
 
 const changedEntries = getChangedEntries();
 const changedFiles = changedEntries?.map((e) => e.filename) ?? null;
+
+// ---- VRT baseline の変更(意図した UI 変更)を「変更前/変更後」で見せる ----
+// baseline PNG は PR の base / head 両方に存在するので、同一リポジトリ blob URL
+// だけで新旧を並べられる(追加ストレージ不要)。SHA は PR API から取る。
+const BASELINE_RE = /-snapshots\/.+\.png$/;
+const changedBaselines = (changedEntries ?? []).filter((e) => BASELINE_RE.test(e.filename));
+function getPrShas() {
+  if (DRY_RUN || changedBaselines.length === 0) return null;
+  try {
+    const pr = JSON.parse(sh("gh", ["api", `repos/${repo}/pulls/${prNumber}`]));
+    return { base: pr.base?.sha, head: pr.head?.sha };
+  } catch {
+    return null; // SHA が取れなければセクションを出さないだけ(コメント本体は生かす)
+  }
+}
+const prShas = getPrShas();
 // Spec files added (not modified) in this PR — their tests are new implementations.
 const addedFiles = new Set(
   (changedEntries ?? []).filter((e) => e.status === "added").map((e) => e.filename),
@@ -256,7 +273,11 @@ for (const test of tests) {
   // Unrelated passing tests are listed by name only, so skip their (expensive)
   // gif conversion and keep them off the ci-media branch.
   if (!wantsMedia(test)) continue;
-  const dir = path.join(outDir, slug(test.title));
+  // slug は60字で切り詰めるため、長い describe パスを持つテスト同士(例: VRT の
+  // tickets list / ticket detail)が同名ディレクトリに衝突しうる。フルタイトルの
+  // 短ハッシュで一意化する。
+  const titleHash = createHash("sha1").update(test.title).digest("hex").slice(0, 8);
+  const dir = path.join(outDir, `${slug(test.title)}-${titleHash}`);
   // Staged snaps (helpers/snap.ts) in order, plus the automatic
   // failure screenshot when present.
   const screenshots = test.attachments.filter(
@@ -410,6 +431,27 @@ function buildComment() {
     md += `共有ファイル(APIのエントリやスキーマ等)を変更すると、それを参照する他機能も\`🔍 関連理由\`付きで表示されます。\n\n`;
   } else {
     md += `各テストを開くと、実行全体の録画と、操作段階ごとのスクリーンショットが見られます。\n\n`;
+  }
+
+  // 意図した UI 変更(update-snapshots で baseline が更新された PR)は、新旧の
+  // 見た目を最上部で並べて見せる — 成果物レビューの本体。ピクセル単位の比較
+  // (スワイプ/2-up)は PR の Files タブが担う。
+  if (changedBaselines.length > 0 && prShas?.base && prShas?.head) {
+    md += `## 🎨 UI の変更(visual baseline 更新)\n\n`;
+    md += `このPRで見た目の基準画像が更新されました。ピクセル単位の比較は PR の Files タブ(2-up / swipe)でできます。\n\n`;
+    const blobAt = (sha, file) => `![](https://github.com/${repo}/blob/${sha}/${file}?raw=true)`;
+    for (const entry of changedBaselines) {
+      // 末尾の「-<browser>-<platform>.png」だけを剥がす(shot 名自体のハイフンは残す)。
+      const shot = path.basename(entry.filename).replace(/-[a-z]+-[a-z]+\.png$/, "");
+      md += `**${shot}**\n\n`;
+      if (entry.status === "added") {
+        md += `| 新規 |\n|---|\n| ${blobAt(prShas.head, entry.filename)} |\n\n`;
+      } else if (entry.status === "removed") {
+        md += `| 削除(変更前の見た目) |\n|---|\n| ${blobAt(prShas.base, entry.filename)} |\n\n`;
+      } else {
+        md += `| 変更前 | 変更後 |\n|---|---|\n| ${blobAt(prShas.base, entry.filename)} | ${blobAt(prShas.head, entry.filename)} |\n\n`;
+      }
+    }
   }
 
   // ファイル → describe → テスト のツリー表示。失敗セクションを成功と分離して先頭に。
