@@ -178,6 +178,8 @@ test.describe("kanban board @feature-kanban", () => {
 
         await test.step("see the forbidden panel, not the columns", async () => {
           await expect(page.getByTestId("board-forbidden")).toBeVisible();
+          // 反証固定(@pinned 相当): Board ナビリンクは agent 専用 — customer には出ない
+          await expect(page.getByTestId("nav-board")).toHaveCount(0);
           await expect(page.getByTestId("kanban-column-open")).toHaveCount(0);
           await snap(page, testInfo, "アクセス禁止");
         });

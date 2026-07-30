@@ -155,4 +155,71 @@ test.describe("ws-realtime over WebSocket @feature-ws-realtime", () => {
       });
     },
   );
+
+  // ---- adversarial review pins (refutation-pinned, exempt from the E2E cap) ----
+
+  test.describe("unauthenticated socket @pinned", () => {
+    // ログインしていないコンテキストからの接続試行(cookie 無し)
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test(
+      "an unauthenticated WebSocket is rejected with close code 1008 @pinned",
+      {
+        annotation: {
+          type: "description",
+          description:
+            "セッション cookie 無しの /api/ws 接続がサーバに close code 1008 で拒否されることを検証(認証ガードの回帰検知)",
+        },
+      },
+      async ({ page }) => {
+        await page.goto("/login");
+        const closeCode = await page.evaluate(
+          () =>
+            new Promise<number>((resolve, reject) => {
+              const scheme = location.protocol === "https:" ? "wss" : "ws";
+              const ws = new WebSocket(`${scheme}://${location.host}/api/ws`);
+              ws.onclose = (event) => resolve(event.code);
+              setTimeout(() => reject(new Error("no close event")), 10_000);
+            }),
+        );
+        expect(closeCode).toBe(1008);
+      },
+    );
+  });
+
+  test(
+    "a reply posted elsewhere appears on an open ticket detail without reload @pinned",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "詳細ページを開いたまま、別ソース(API)からの返信が reload なしでスレッドに反映される(get の invalidate)ことを検証",
+      },
+    },
+    async ({ page, request }, testInfo) => {
+      const subject = `WS detail live: ${test.info().testId}`;
+      let ticketId = "";
+      await test.step("prepare a test-owned ticket and open its detail", async () => {
+        ticketId = await createTicket(request, subject);
+        const liveSocket = page.waitForEvent("websocket", {
+          predicate: (ws) => ws.url().includes("/api/ws"),
+        });
+        await page.goto(`/tickets/${ticketId}`);
+        await expect(page.getByTestId("ticket-subject")).toContainText(subject);
+        await liveSocket;
+        await snap(page, testInfo, "詳細表示");
+      });
+
+      await test.step("post a reply over the API and watch it appear live", async () => {
+        const before = await page.getByTestId("message-item").count();
+        const res = await request.post("/api/rpc/tickets/reply", {
+          data: { json: { ticketId, body: "Live reply over the wire." } },
+        });
+        expect(res.ok()).toBeTruthy();
+        await expect(page.getByTestId("message-item")).toHaveCount(before + 1);
+        await expect(page.getByTestId("message-item").last()).toContainText("Live reply");
+        await snap(page, testInfo, "自動反映後");
+      });
+    },
+  );
 });
