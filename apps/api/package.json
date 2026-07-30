@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node --env-file-if-exists=${API_ENV_FILE:-.env} --import tsx src/index.ts",
     "test": "vp test run",
+    "evals": "tsx evals/run.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

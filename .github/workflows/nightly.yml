@@ -97,6 +97,31 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 14
 
+  # Evals lane: reply-draft LLM quality regression (spec: specs/evals.md).
+  # No DB, no Playwright — the harness assembles the production prompts as pure
+  # functions and calls Gemini directly (generation + LLM-as-judge).
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run reply-draft evals
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: pnpm evals
+      - name: Upload evals report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: evals-report
+          path: apps/api/evals-report.json
+          retention-days: 14
+
   # Perf lane: record traces for every test; the trace-analyst skill consumes
   # the artifact locally (gh run download --name perf-traces).
   perf:

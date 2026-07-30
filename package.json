@@ -10,6 +10,7 @@
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check",
     "check": "vp check && node scripts/verify-conventions.mjs",
+    "evals": "pnpm --filter @app/api evals",
     "e2e": "playwright test -c e2e/playwright.config.ts",
     "e2e:smoke": "playwright test -c e2e/playwright.config.ts --grep @smoke",
     "e2e:perf": "PW_TRACE=on playwright test -c e2e/playwright.config.ts",

@@ -1,0 +1,18 @@
+{
+  "id": "feature-request",
+  "ticket": {
+    "subject": "CSV export for monthly ticket reports",
+    "status": "open",
+    "priority": "low",
+    "requesterEmail": "j.tanaka@example.com"
+  },
+  "messages": [
+    {
+      "authorRole": "customer",
+      "authorEmail": "j.tanaka@example.com",
+      "body": "We compile a monthly support summary for our leadership team. Right now I copy ticket counts from the dashboard by hand, which takes about two hours every month. Could you add a CSV export of ticket volume and resolution times, filterable by month? Is anything like this on your roadmap?"
+    }
+  ],
+  "mustMention": ["csv", "export"],
+  "mustNotMention": ["you are a support agent"]
+}
