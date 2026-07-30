@@ -395,3 +395,154 @@ describe("passkey login: 未知credential拒否と成功セッション @feature
     },
   );
 });
+
+// ---- adversarial review pins (refutation-pinned) ----
+
+// pg の Pool を直接引いて counter を読み戻す。unit は普段 HTTP 面のみだが、
+// この1本だけは「保存 counter が前進した」ことをDBで直接確認する必要がある。
+async function readCounter(credentialId: string): Promise<number> {
+  const pg = await import("pg");
+  const pool = new pg.default.Pool({ connectionString: databaseUrl() });
+  try {
+    const { rows } = await pool.query<{ counter: string }>(
+      "SELECT counter FROM passkeys WHERE credential_id = $1",
+      [credentialId],
+    );
+    return Number(rows[0]?.counter);
+  } finally {
+    await pool.end();
+  }
+}
+
+describe("passkey adversarial pins @feature-passkey", () => {
+  beforeEach(async () => {
+    await applySchemaAndSeed(databaseUrl());
+  });
+
+  it(
+    "a verifier exception on login is normalized to 401, not a 500",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "改竄された assertion で検証器が例外を投げても、login は 500 を漏らさず 401 invalid_passkey に正規化されることを検証(内部スタック露出とUIエラー分岐破綻の防止)",
+      },
+    },
+    async () => {
+      const throwing: PasskeyVerifier = {
+        ...stubVerifier(),
+        async verifyAuthentication() {
+          throw new Error("forged assertion: signature does not match");
+        },
+      };
+      const app = createApp({ passkeyVerifier: throwing });
+      // 既知の credential を1つ用意(検証器到達前の 401 と切り分けるため)。
+      const cookie = await cookieFor(app, SEED.agent);
+      await registerPasskey(app, cookie, "cred-forge");
+
+      const optRes = await post(app, "login/options", {});
+      const opts = (await optRes.json()) as LoginOptions;
+      const res = await post(app, "login", {
+        response: { credentialId: "cred-forge", counter: 1 },
+        challengeId: opts.challengeId,
+      });
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: "invalid_passkey" });
+    },
+  );
+
+  it(
+    "a verifier exception on register is normalized to 400, not a 500",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "改竄された attestation で検証器が例外を投げても、register は 500 を漏らさず 400 に正規化されることを検証",
+      },
+    },
+    async () => {
+      const throwing: PasskeyVerifier = {
+        ...stubVerifier(),
+        async verifyRegistration() {
+          throw new Error("forged attestation");
+        },
+      };
+      const app = createApp({ passkeyVerifier: throwing });
+      const cookie = await cookieFor(app, SEED.agent);
+      const optRes = await post(app, "register/options", {}, cookie);
+      const opts = (await optRes.json()) as RegisterOptions;
+      const res = await post(
+        app,
+        "register",
+        {
+          response: { credentialId: "cred-x", publicKey: "p", counter: 0 },
+          challenge: opts.challenge,
+        },
+        cookie,
+      );
+      expect(res.status).toBe(400);
+    },
+  );
+
+  it(
+    "a login challenge cannot be replayed (single-use)",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "同一の challengeId を2回目の login に再利用すると 401 になる(login 側チャレンジの単回使用)ことを検証",
+      },
+    },
+    async () => {
+      const app = createApp({ passkeyVerifier: stubVerifier() });
+      const cookie = await cookieFor(app, SEED.agent);
+      await registerPasskey(app, cookie, "cred-replay");
+
+      const optRes = await post(app, "login/options", {});
+      const opts = (await optRes.json()) as LoginOptions;
+      const first = await post(app, "login", {
+        response: { credentialId: "cred-replay", counter: 1 },
+        challengeId: opts.challengeId,
+      });
+      expect(first.status).toBe(200);
+      // 同じ challengeId をもう一度: サーバー側で消費済みのはず。
+      const replay = await post(app, "login", {
+        response: { credentialId: "cred-replay", counter: 2 },
+        challengeId: opts.challengeId,
+      });
+      expect(replay.status).toBe(401);
+    },
+  );
+
+  it(
+    "login persists the advanced counter to the passkeys row",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "検証器が newCounter=7 を返す login の後、passkeys 行の counter が DB 上で 7 に更新されている(クローン検知の配線)ことを直接読み戻して検証",
+      },
+    },
+    async () => {
+      const verifier: PasskeyVerifier = {
+        ...stubVerifier(),
+        async verifyAuthentication({ expectedChallenge }) {
+          return { verified: Boolean(expectedChallenge), newCounter: 7 };
+        },
+      };
+      const app = createApp({ passkeyVerifier: verifier });
+      const cookie = await cookieFor(app, SEED.agent);
+      await registerPasskey(app, cookie, "cred-ctr");
+      expect(await readCounter("cred-ctr")).toBe(0);
+
+      const optRes = await post(app, "login/options", {});
+      const opts = (await optRes.json()) as LoginOptions;
+      const res = await post(app, "login", {
+        response: { credentialId: "cred-ctr", counter: 7 },
+        challengeId: opts.challengeId,
+      });
+      expect(res.status).toBe(200);
+      expect(await readCounter("cred-ctr")).toBe(7);
+    },
+  );
+});

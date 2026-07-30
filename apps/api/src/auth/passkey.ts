@@ -176,10 +176,18 @@ export function createPasskeyRouter(args: {
       return c.json({ error: "challenge_mismatch" }, 400);
     }
 
-    const verification = await verifierFor(c.req.header("origin")).verifyRegistration({
-      response: body.response,
-      expectedChallenge: stored,
-    });
+    // @simplewebauthn throws on a malformed/forged attestation rather than
+    // returning verified:false — normalize both to a 400 client error, never a
+    // 500 leaking an internal stack.
+    let verification: Awaited<ReturnType<PasskeyVerifier["verifyRegistration"]>>;
+    try {
+      verification = await verifierFor(c.req.header("origin")).verifyRegistration({
+        response: body.response,
+        expectedChallenge: stored,
+      });
+    } catch {
+      return c.json({ error: "registration_failed" }, 400);
+    }
     if (!verification.verified) {
       return c.json({ error: "registration_failed" }, 400);
     }
@@ -241,15 +249,23 @@ export function createPasskeyRouter(args: {
     const row = rows[0];
     if (!row) return c.json({ error: "invalid_passkey" }, 401);
 
-    const verification = await verifierFor(c.req.header("origin")).verifyAuthentication({
-      response: body.response,
-      expectedChallenge: stored,
-      credential: {
-        credentialId: row.credential_id,
-        publicKey: row.public_key,
-        counter: Number(row.counter),
-      },
-    });
+    // A forged/tampered assertion makes @simplewebauthn throw rather than return
+    // verified:false. Normalize both to the 401 the client's login-error path
+    // expects — never a 500 leaking an internal stack.
+    let verification: Awaited<ReturnType<PasskeyVerifier["verifyAuthentication"]>>;
+    try {
+      verification = await verifierFor(c.req.header("origin")).verifyAuthentication({
+        response: body.response,
+        expectedChallenge: stored,
+        credential: {
+          credentialId: row.credential_id,
+          publicKey: row.public_key,
+          counter: Number(row.counter),
+        },
+      });
+    } catch {
+      return c.json({ error: "invalid_passkey" }, 401);
+    }
     if (!verification.verified) return c.json({ error: "invalid_passkey" }, 401);
 
     await pool.query("UPDATE passkeys SET counter = $1 WHERE credential_id = $2", [
