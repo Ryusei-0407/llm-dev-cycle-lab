@@ -391,10 +391,7 @@ describe("summarize", () => {
       },
     },
     () => {
-      const summary = summarize([
-        makeResult({ id: "a" }),
-        makeResult({ id: "b", verdict: null }),
-      ]);
+      const summary = summarize([makeResult({ id: "a" }), makeResult({ id: "b", verdict: null })]);
       expect(summary.pass).toBe(false);
     },
   );
