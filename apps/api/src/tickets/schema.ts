@@ -25,7 +25,32 @@ export const replyInput = z.object({
   body: z.string().min(1).max(2000),
 });
 
+// ticket-model (spec: specs/ticket-model.md). setAssignee takes the ticket id
+// plus the target agent email or null (unassign); the "is it an agent" check is
+// a DB lookup done in the store, not zod. setLabels takes label names for a full
+// replace (empty = clear all); duplicates are normalised in the store.
+export const setAssigneeInput = z.object({
+  id: z.string().uuid(),
+  assigneeEmail: z.string().email().nullable(),
+});
+
+export const setLabelsInput = z.object({
+  id: z.string().uuid(),
+  labels: z.array(z.string()),
+});
+
+// listPage: opaque cursor + a 1..100 limit (default 50). The cursor's internal
+// shape (base64url("createdAt|id")) is decoded in the store; a malformed token
+// is a runtime BAD_REQUEST there, not a zod error.
+export const listPageInput = z.object({
+  cursor: z.string().optional(),
+  limit: z.number().int().min(1).max(100).default(50),
+});
+
 export type CreateInput = z.infer<typeof createInput>;
 export type SetStatusInput = z.infer<typeof setStatusInput>;
 export type GetInput = z.infer<typeof getInput>;
 export type ReplyInput = z.infer<typeof replyInput>;
+export type SetAssigneeInput = z.infer<typeof setAssigneeInput>;
+export type SetLabelsInput = z.infer<typeof setLabelsInput>;
+export type ListPageInput = z.infer<typeof listPageInput>;

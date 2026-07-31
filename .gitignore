@@ -24,4 +24,6 @@ worklog.md
 
 # VRT baseline は linux(CI 生成)のみ追跡する。ローカルの CI=1 実行が書く
 # darwin 版は環境依存のノイズなので追跡しない
-*-snapshots/*-darwin.png
+# (スラッシュを含む pattern はルート起点になるため **/ が必要 — e2e/ 配下の
+#  ネストしたスナップショットディレクトリにもマッチさせる)
+**/*-snapshots/*-darwin.png

@@ -21,34 +21,61 @@ import type { Page } from "@playwright/test";
 test.use({ video: "off" });
 
 test.describe("visual regression @feature-visual @visual", () => {
+  const LABELS = [
+    { name: "auth", color: "#e2626b" },
+    { name: "billing", color: "#f2c94c" },
+    { name: "request", color: "#9a6ae2" },
+  ];
   const TICKETS = [
     {
       id: "00000000-0000-7000-8000-00000000fa01",
+      number: 1,
       subject: "Cannot sign in from SSO",
       status: "open",
       priority: "high",
       requesterEmail: "casey@example.com",
+      assigneeEmail: "aki@example.com",
+      labels: [LABELS[0]],
       createdAt: "2026-07-01T09:00:00.000Z",
+      updatedAt: "2026-07-01T09:20:00.000Z",
     },
     {
       id: "00000000-0000-7000-8000-00000000fa02",
+      number: 2,
       subject: "Invoice PDF renders blank",
       status: "in_progress",
       priority: "medium",
       requesterEmail: "morgan@example.com",
+      assigneeEmail: null,
+      labels: [LABELS[1]],
       createdAt: "2026-07-02T09:00:00.000Z",
+      updatedAt: "2026-07-02T09:00:00.000Z",
     },
     {
       id: "00000000-0000-7000-8000-00000000fa03",
+      number: 3,
       subject: "Feature request: weekly digest",
       status: "resolved",
       priority: "low",
       requesterEmail: "sam@example.com",
+      assigneeEmail: null,
+      labels: [LABELS[2]],
       createdAt: "2026-07-03T09:00:00.000Z",
+      updatedAt: "2026-07-03T09:00:00.000Z",
     },
   ];
   const DETAIL = {
     ticket: TICKETS[0],
+    // ticket-model のイベント行(状態変更の履歴)も1件固定表示する。
+    events: [
+      {
+        id: "00000000-0000-7000-8000-00000000fc01",
+        type: "status_changed",
+        actorEmail: "aki@example.com",
+        payload: { from: "open", to: "in_progress" },
+        createdAt: "2026-07-01T09:10:00.000Z",
+      },
+    ],
     messages: [
       {
         id: "00000000-0000-7000-8000-00000000fb01",
@@ -76,6 +103,13 @@ test.describe("visual regression @feature-visual @visual", () => {
     );
     await page.route("**/api/rpc/tickets/get", (route) =>
       route.fulfill({ json: { json: DETAIL } }),
+    );
+    // 詳細の agent 操作列(status/assignee/labels)が使うカタログ系も固定する。
+    await page.route("**/api/rpc/tickets/labels", (route) =>
+      route.fulfill({ json: { json: LABELS } }),
+    );
+    await page.route("**/api/rpc/tickets/agents", (route) =>
+      route.fulfill({ json: { json: [{ email: "aki@example.com", name: "Aki Agent" }] } }),
     );
   }
 

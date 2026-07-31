@@ -93,7 +93,7 @@ function TicketsPage() {
   };
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 p-4">
+    <main className="mx-auto flex min-h-dvh max-w-5xl flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Tickets</h1>
         <Button type="button" onClick={() => setShowForm((v) => !v)}>

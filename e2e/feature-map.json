@@ -50,6 +50,7 @@
     "apps/web/src/routes/__root.tsx"
   ],
   "kanban": ["apps/web/src/routes/board.tsx", "apps/web/src/components/kanban-board.tsx"],
+  "ticket-model": ["apps/api/**", "apps/web/src/**", "e2e/tests/ticket-model.spec.ts"],
   "ws-realtime": [
     "apps/api/src/realtime.ts",
     "apps/api/src/app.ts",
