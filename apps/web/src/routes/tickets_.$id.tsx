@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { orpc } from "@/lib/orpc";
 import { useSessionUser } from "@/lib/session";
+import type { Label } from "@/lib/tickets";
 
 // Auth guard mirrors /tickets: resolve the session in beforeLoad and redirect
 // unauthenticated visitors before any detail UI mounts (specs/auth.md).
@@ -54,11 +55,11 @@ function TicketDetailPage() {
     retry: false,
   });
 
+  const invalidateDetail = () =>
+    queryClient.invalidateQueries({ queryKey: orpc.tickets.get.queryKey({ input: { id } }) });
+
   const replyMutation = useMutation(
-    orpc.tickets.reply.mutationOptions({
-      onSuccess: () =>
-        queryClient.invalidateQueries({ queryKey: orpc.tickets.get.queryKey({ input: { id } }) }),
-    }),
+    orpc.tickets.reply.mutationOptions({ onSuccess: invalidateDetail }),
   );
 
   const [body, setBody] = useState("");
@@ -109,11 +110,15 @@ function TicketDetailPage() {
 
   const ticket = detailQuery.data?.ticket;
   const messages = detailQuery.data?.messages ?? [];
+  const events = detailQuery.data?.events ?? [];
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 p-4">
       {ticket && (
         <div className="flex items-center gap-3">
+          <span data-testid="ticket-number" className="text-sm text-ink-subtle tabular-nums">
+            SUP-{ticket.number}
+          </span>
           <h1 data-testid="ticket-subject" className="flex-1 text-xl font-semibold tracking-tight">
             {ticket.subject}
           </h1>
@@ -121,7 +126,14 @@ function TicketDetailPage() {
         </div>
       )}
 
-      <MessageThread messages={messages} />
+      {ticket && isAgent && (
+        <div className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 p-4">
+          <AssigneeControl ticketId={id} assigneeEmail={ticket.assigneeEmail ?? null} />
+          <LabelControl ticketId={id} labels={ticket.labels ?? []} />
+        </div>
+      )}
+
+      <MessageThread messages={messages} events={events} />
 
       {isAgent && (
         <DraftPanel
@@ -159,5 +171,93 @@ function TicketDetailPage() {
         </div>
       </form>
     </main>
+  );
+}
+
+// Agent-only assignee control (spec: specs/ticket-model.md 詳細). The options are
+// 未割り当て (value "") plus the agents directory; changing the selection sends
+// setAssignee ("" → null) and re-fetches the detail to reflect the new event +
+// assignee. Only mounted for agents, so tickets.agents (agent-only) is safe.
+function AssigneeControl({
+  ticketId,
+  assigneeEmail,
+}: {
+  ticketId: string;
+  assigneeEmail: string | null;
+}) {
+  const queryClient = useQueryClient();
+  const agentsQuery = useQuery({ ...orpc.tickets.agents.queryOptions(), retry: false });
+  const setAssignee = useMutation(
+    orpc.tickets.setAssignee.mutationOptions({
+      onSuccess: () =>
+        queryClient.invalidateQueries({
+          queryKey: orpc.tickets.get.queryKey({ input: { id: ticketId } }),
+        }),
+    }),
+  );
+  const agents = agentsQuery.data ?? [];
+  return (
+    <select
+      data-testid="assignee-select"
+      aria-label="Assignee"
+      value={assigneeEmail ?? ""}
+      onChange={(e) => setAssignee.mutate({ id: ticketId, assigneeEmail: e.target.value || null })}
+      className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <option value="">未割り当て</option>
+      {agents.map((agent) => (
+        <option key={agent.email} value={agent.email}>
+          {agent.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// Agent-only label editor (spec: specs/ticket-model.md 詳細). Every catalogue
+// label renders as a toggle reflecting current assignment; clicking flips it and
+// sends the full resulting name set via setLabels (server does the全置換).
+function LabelControl({ ticketId, labels }: { ticketId: string; labels: Label[] }) {
+  const queryClient = useQueryClient();
+  const catalogQuery = useQuery({ ...orpc.tickets.labels.queryOptions(), retry: false });
+  const setLabels = useMutation(
+    orpc.tickets.setLabels.mutationOptions({
+      onSuccess: () =>
+        queryClient.invalidateQueries({
+          queryKey: orpc.tickets.get.queryKey({ input: { id: ticketId } }),
+        }),
+    }),
+  );
+  const catalog = catalogQuery.data ?? [];
+  const active = new Set(labels.map((l) => l.name));
+  const toggle = (name: string) => {
+    const next = new Set(active);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setLabels.mutate({ id: ticketId, labels: [...next] });
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {catalog.map((label) => {
+        const on = active.has(label.name);
+        return (
+          <button
+            key={label.name}
+            type="button"
+            data-testid={`label-toggle-${label.name}`}
+            aria-pressed={on}
+            onClick={() => toggle(label.name)}
+            className="rounded px-2 py-0.5 text-xs font-medium transition-opacity"
+            style={{
+              backgroundColor: label.color,
+              color: "#fff",
+              opacity: on ? 1 : 0.35,
+            }}
+          >
+            {label.name}
+          </button>
+        );
+      })}
+    </div>
   );
 }

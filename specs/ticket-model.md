@@ -125,13 +125,13 @@ UPDATE tickets SET assignee_email = 'agent@example.com'
   - agent 専用(customer は FORBIDDEN)。存在しない id は NOT_FOUND
   - `assigneeEmail` は users に存在する **role='agent'** のメールのみ許可。
     それ以外(customer のメール・未知のメール)は `ORPCError("BAD_REQUEST",
-    { message: "not an agent" })`。`null` で未割り当てに戻す
+{ message: "not an agent" })`。`null` で未割り当てに戻す
   - 変更成功時 `assignee_changed` イベント + updated_at 更新 + `ticket.updated`
     ブロードキャスト。同値(null→null 含む)はイベント・更新・配信なしで成功
 - `tickets.setLabels` input `{ id: string, labels: string[] }` → `Ticket`
   - agent 専用。ラベル **name** の配列で全置換(空配列=全解除)。重複 name は
     1つに正規化。カタログにない name は `ORPCError("BAD_REQUEST",
-    { message: "unknown label" })`
+{ message: "unknown label" })`
   - 変更成功時 `labels_changed` イベント(payload from/to は name 昇順)+
     updated_at 更新 + `ticket.updated` ブロードキャスト。集合として同値なら何もしない
 - `tickets.labels` input なし → `Label[]`(name 昇順)。セッション必須(ロール不問)
