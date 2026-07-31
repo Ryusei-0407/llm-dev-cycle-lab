@@ -35,6 +35,10 @@ test.describe("ticket-model over oRPC @feature-ticket-model", () => {
 
       await test.step("詳細を開く", async () => {
         await page.getByTestId("ticket-link").filter({ hasText: "Billing question" }).click();
+        // ticket-number は一覧の各行にも存在し、URL は遷移開始時点で先に変わる
+        // (旧ルートは beforeLoad 解決まで表示され続ける)。詳細にしか無い
+        // ticket-subject の出現 = 一覧 unmount を待ってから番号を検証する。
+        await expect(page.getByTestId("ticket-subject")).toHaveText("Billing question");
         await expect(page.getByTestId("ticket-number")).toHaveText("SUP-2");
         await snap(page, testInfo, "詳細表示");
       });
