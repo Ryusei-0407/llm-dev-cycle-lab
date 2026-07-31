@@ -20,6 +20,20 @@ export default defineConfig({
   // teardown). Runs after all webServers are down. Spec: specs/database.md.
   globalTeardown: path.join(configDir, "global-teardown.ts"),
   fullyParallel: true,
+  // VRT(visual.spec.ts)の baseline は linux(CI)でのみ生成・比較する。
+  // darwin はフォントレンダリング差で必ずずれるため、ローカルでは snapshot
+  // 比較をスキップ(テスト自体は走る = ページが壊れていないことは見る)。
+  // baseline 更新は update-snapshots ワークフローを対象ブランチへ dispatch。
+  ignoreSnapshots: !process.env.CI,
+  expect: {
+    toHaveScreenshot: {
+      // アニメーション停止 + キャレット非表示で撮影を安定化。maxDiffPixels は
+      // アンチエイリアスの1px 揺れを許す最小限(意味のある UI 変化は数百px 単位)。
+      animations: "disabled" as const,
+      caret: "hide" as const,
+      maxDiffPixels: 64,
+    },
+  },
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,

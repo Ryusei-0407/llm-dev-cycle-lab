@@ -65,7 +65,9 @@ LLMへの「お願い」は忘れられる。守らせたいものは構造(hook
   反証フェーズで固定されたテストは上限に数えない
 - タグ: `@feature-<name>`(必須)/ `@smoke`(主経路)/ `@backend`(nightly)/
   `@component`(CT)/ `@quarantine`(flaky隔離、nightlyのみ・ゲート外)/
-  `@pinned`(反証フェーズで固定されたテスト。E2E本数上限の免除根拠)
+  `@pinned`(反証フェーズで固定されたテスト。E2E本数上限の免除根拠)/
+  `@visual`(VRT。1テスト=1画面撮影のため snap 段階スクショと本数上限の対象外。
+  baseline は linux/CI 生成、更新は update-snapshots ワークフロー)
 - 接続情報・環境依存の値をテストコードに書かない(設定・環境変数で差し替え可能に保つ)
 - テストには日本語の `description` annotation を付ける(`test("...", { annotation: { type: "description", description: "…を検証" } }, async …)`)。
   「何を検証するか」を1文で。PRメディアコメントが各テストの説明として表示する

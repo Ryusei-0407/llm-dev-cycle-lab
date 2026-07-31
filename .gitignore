@@ -21,3 +21,7 @@ apps/web/test-browser/__screenshots__/
 worklog.md
 .DS_Store
 .vitest-attachments/
+
+# VRT baseline は linux(CI 生成)のみ追跡する。ローカルの CI=1 実行が書く
+# darwin 版は環境依存のノイズなので追跡しない
+*-snapshots/*-darwin.png

@@ -22,6 +22,7 @@
 //
 // Env (CI mode): GH_TOKEN, PR_NUMBER, GITHUB_REPOSITORY, GITHUB_RUN_ID
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
@@ -171,6 +172,24 @@ function getChangedEntries() {
 
 const changedEntries = getChangedEntries();
 const changedFiles = changedEntries?.map((e) => e.filename) ?? null;
+
+// ---- VRT baseline の変更(意図した UI 変更)を「変更前/変更後」で見せる ----
+// baseline PNG は PR の base / head 両方に存在するので、同一リポジトリ blob URL
+// だけで新旧を並べられる(追加ストレージ不要)。SHA は PR API から取る。
+// baseline は linux 限定(darwin はフォント差ノイズで追跡外)。万一 darwin が
+// 紛れ込んでも UI 変更として表示しない。
+const BASELINE_RE = /-snapshots\/.+-linux\.png$/;
+const changedBaselines = (changedEntries ?? []).filter((e) => BASELINE_RE.test(e.filename));
+function getPrShas() {
+  if (DRY_RUN || changedBaselines.length === 0) return null;
+  try {
+    const pr = JSON.parse(sh("gh", ["api", `repos/${repo}/pulls/${prNumber}`]));
+    return { base: pr.base?.sha, head: pr.head?.sha };
+  } catch {
+    return null; // SHA が取れなければセクションを出さないだけ(コメント本体は生かす)
+  }
+}
+const prShas = getPrShas();
 // Spec files added (not modified) in this PR — their tests are new implementations.
 const addedFiles = new Set(
   (changedEntries ?? []).filter((e) => e.status === "added").map((e) => e.filename),
@@ -252,19 +271,58 @@ try {
 }
 
 for (const test of tests) {
-  test.media = { screenshots: [], gifs: [] };
+  test.media = { screenshots: [], gifs: [], visuals: [] };
   // Unrelated passing tests are listed by name only, so skip their (expensive)
   // gif conversion and keep them off the ci-media branch.
   if (!wantsMedia(test)) continue;
-  const dir = path.join(outDir, slug(test.title));
+  // slug は60字で切り詰めるため、長い describe パスを持つテスト同士(例: VRT の
+  // tickets list / ticket detail)が同名ディレクトリに衝突しうる。フルタイトルの
+  // 短ハッシュで一意化する。
+  const titleHash = createHash("sha1").update(test.title).digest("hex").slice(0, 8);
+  const dir = path.join(outDir, `${slug(test.title)}-${titleHash}`);
   // Staged snaps (helpers/snap.ts) in order, plus the automatic
   // failure screenshot when present.
   const screenshots = test.attachments.filter(
     (a) => a.name === "screenshot" || a.name.startsWith("stage: "),
   );
+  // VRT の成果物スクリーンショット(visual spec が成功時に添付する)。録画は
+  // VRT では撮らない方針なので、これが visual テストの表示メディアになる。
+  const shotAttachments = test.attachments.filter((a) => a.name.startsWith("shot: "));
   const videos = test.attachments.filter((a) => a.name === "video");
-  if (screenshots.length === 0 && videos.length === 0) continue;
+  // toHaveScreenshot の失敗添付(<shot>-expected/-actual/-diff.png)を3枚組に
+  // まとめる。VRT の差分を「期待/実際/差分」で並べて見せる一次データ。
+  const visualTriplets = new Map();
+  for (const a of test.attachments) {
+    const m = a.name.match(/^(.+)-(expected|actual|diff)\.png$/);
+    if (!m) continue;
+    if (!visualTriplets.has(m[1])) visualTriplets.set(m[1], {});
+    visualTriplets.get(m[1])[m[2]] = a;
+  }
+  if (
+    screenshots.length === 0 &&
+    videos.length === 0 &&
+    visualTriplets.size === 0 &&
+    shotAttachments.length === 0
+  )
+    continue;
   mkdirSync(dir, { recursive: true });
+  test.media.shots = [];
+  for (const a of shotAttachments) {
+    const label = a.name.slice("shot: ".length);
+    const file = path.join(dir, `shot-${slug(label)}.png`);
+    cpSync(a.path, file);
+    test.media.shots.push({ file, label });
+  }
+  for (const [shot, parts] of visualTriplets) {
+    const visual = { label: shot };
+    for (const kind of ["expected", "actual", "diff"]) {
+      if (!parts[kind]) continue;
+      const file = path.join(dir, `visual-${slug(shot)}-${kind}.png`);
+      cpSync(parts[kind].path, file);
+      visual[kind] = file;
+    }
+    test.media.visuals.push(visual);
+  }
   screenshots.forEach((a, i) => {
     const file = path.join(dir, `screenshot-${i + 1}${path.extname(a.path) || ".png"}`);
     cpSync(a.path, file);
@@ -393,6 +451,27 @@ function buildComment() {
     md += `各テストを開くと、実行全体の録画と、操作段階ごとのスクリーンショットが見られます。\n\n`;
   }
 
+  // 意図した UI 変更(update-snapshots で baseline が更新された PR)は、新旧の
+  // 見た目を最上部で並べて見せる — 成果物レビューの本体。ピクセル単位の比較
+  // (スワイプ/2-up)は PR の Files タブが担う。
+  if (changedBaselines.length > 0 && prShas?.base && prShas?.head) {
+    md += `## 🎨 UI の変更(visual baseline 更新)\n\n`;
+    md += `このPRで見た目の基準画像が更新されました。ピクセル単位の比較は PR の Files タブ(2-up / swipe)でできます。\n\n`;
+    const blobAt = (sha, file) => `![](https://github.com/${repo}/blob/${sha}/${file}?raw=true)`;
+    for (const entry of changedBaselines) {
+      // 末尾の「-<browser>-<platform>.png」だけを剥がす(shot 名自体のハイフンは残す)。
+      const shot = path.basename(entry.filename).replace(/-[a-z]+-[a-z]+\.png$/, "");
+      md += `**${shot}**\n\n`;
+      if (entry.status === "added") {
+        md += `| 新規 |\n|---|\n| ${blobAt(prShas.head, entry.filename)} |\n\n`;
+      } else if (entry.status === "removed") {
+        md += `| 削除(変更前の見た目) |\n|---|\n| ${blobAt(prShas.base, entry.filename)} |\n\n`;
+      } else {
+        md += `| 変更前 | 変更後 |\n|---|---|\n| ${blobAt(prShas.base, entry.filename)} | ${blobAt(prShas.head, entry.filename)} |\n\n`;
+      }
+    }
+  }
+
   // ファイル → describe → テスト のツリー表示。失敗セクションを成功と分離して先頭に。
   const stripTags = (text) => text.replace(/\s*@[\w-]+/g, "").trim();
   const displayFile = (text) => text.replace(/^(\.\.\/)+/, "");
@@ -424,7 +503,7 @@ function buildComment() {
           md += `**${describe}**\n\n`;
           lastDescribe = describe;
         }
-        const media = test.media ?? { screenshots: [], gifs: [] };
+        const media = test.media ?? { screenshots: [], gifs: [], visuals: [] };
         const tags = [...new Set(test.title.match(/@[\w-]+/g) ?? [])];
         const tagBadges = tags.map((t) => `<code>${t}</code>`).join(" ");
         const descLine = test.description ? `<br>📝 ${test.description}` : "";
@@ -435,8 +514,27 @@ function buildComment() {
           for (const line of excerpt.split("\n")) md += `> ${line}\n`;
           md += `\n`;
         }
-        if (media.screenshots.length === 0 && media.gifs.length === 0) {
+        // VRT の差分は「期待 / 実際 / 差分」を横並びで最初に見せる — UI 変更の
+        // 成果物レビューはこの3枚組が本体で、録画・段階スクショは補助。
+        if ((media.visuals ?? []).length > 0) {
+          md += `#### 🎨 ビジュアル差分(期待 / 実際 / 差分)\n\n`;
+          for (const visual of media.visuals) {
+            const cell = (file) => (file ? `![](${blobBase}/${toRepoPath(file)}?raw=true)` : "—");
+            md += `**${visual.label}**\n\n`;
+            md += `| 期待(baseline) | 実際 | 差分 |\n|---|---|---|\n`;
+            md += `| ${cell(visual.expected)} | ${cell(visual.actual)} | ${cell(visual.diff)} |\n\n`;
+          }
+        }
+        if (
+          media.screenshots.length === 0 &&
+          media.gifs.length === 0 &&
+          (media.visuals ?? []).length === 0 &&
+          (media.shots ?? []).length === 0
+        ) {
           md += `_このテストのメディアはありません_\n`;
+        }
+        for (const shot of media.shots ?? []) {
+          md += `#### 🖼️ スクリーンショット: ${shot.label}\n\n![${shot.label}](${blobBase}/${toRepoPath(shot.file)}?raw=true)\n\n`;
         }
         for (const gif of media.gifs) {
           md += `#### 📹 実行の録画\n\n![録画](${blobBase}/${toRepoPath(gif)}?raw=true)\n\n`;

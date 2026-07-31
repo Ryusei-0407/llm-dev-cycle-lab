@@ -3,6 +3,11 @@
 // stories are discovered from src/**/*.story.tsx via import.meta.glob.
 import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
+// 本体と同じテーマでストーリーを描画する(VRT はここを撮る): グローバル CSS を
+// 読み込み、アプリの index.html と同じダーク固定クラスを立てる。
+import "/src/styles.css";
+
+document.documentElement.classList.add("dark");
 
 type StoryModule = Record<string, (props?: Record<string, unknown>) => unknown>;
 
