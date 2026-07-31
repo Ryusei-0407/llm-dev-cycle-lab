@@ -1,8 +1,29 @@
+import { z } from "zod";
 import type { Pool } from "../db.js";
 import { createInput } from "./schema.js";
 
 export type TicketStatus = "open" | "in_progress" | "resolved";
 export type TicketPriority = "low" | "medium" | "high";
+
+// Reply lives in the store so a message + the ticket's updated_at touch commit
+// together (spec: reply は履歴対象外 — no event). MessageRole/Message mirror
+// messages.ts; kept as a local structural copy to avoid a store↔messages import
+// cycle (messages.ts already imports NotFoundError from here).
+export type MessageRole = "customer" | "agent";
+export type Message = {
+  id: string;
+  ticketId: string;
+  authorEmail: string;
+  authorRole: MessageRole;
+  body: string;
+  createdAt: string;
+};
+export type ReplyStoreInput = {
+  ticketId: string;
+  authorEmail: string;
+  authorRole: MessageRole;
+  body: string;
+};
 
 export type Label = { name: string; color: string };
 
@@ -119,29 +140,10 @@ const GET_BY_ID_SQL = `SELECT ${COLUMNS} FROM tickets t WHERE t.id = $1`;
 // applies the requesterEmail filter when asked. Existing no-arg calls are unchanged.
 export type ListFilter = { requesterEmail?: string };
 
-// Opaque cursor: base64url("${createdAt ISO}|${id}"). Encapsulated here so the
-// wire token stays a store concern; a malformed token is a BadRequestError the
-// router maps to BAD_REQUEST "invalid cursor".
-export function encodeCursor(createdAt: string, id: string): string {
-  return Buffer.from(`${createdAt}|${id}`, "utf8").toString("base64url");
-}
-
-export function decodeCursor(cursor: string): { createdAt: string; id: string } {
-  let decoded: string;
-  try {
-    decoded = Buffer.from(cursor, "base64url").toString("utf8");
-  } catch {
-    throw new BadRequestError("invalid cursor");
-  }
-  const sep = decoded.indexOf("|");
-  if (sep < 0) throw new BadRequestError("invalid cursor");
-  const createdAt = decoded.slice(0, sep);
-  const id = decoded.slice(sep + 1);
-  // A valid token always carries a parseable ISO timestamp and a non-empty id;
-  // anything else is a forged/corrupt cursor.
-  if (!id || Number.isNaN(Date.parse(createdAt))) throw new BadRequestError("invalid cursor");
-  return { createdAt, id };
-}
+// The opaque keyset cursor lives in cursor.ts; re-exported so existing importers
+// (and listPage below) can keep reaching it through the store module.
+export { decodeCursor, encodeCursor } from "./cursor.js";
+import { decodeCursor, encodeCursor } from "./cursor.js";
 
 export type ListPageResult = { items: Ticket[]; nextCursor: string | null };
 export type ListPageArgs = { cursor?: string; limit: number; requesterEmail?: string };
@@ -156,6 +158,17 @@ export function createTicketStore(pool: Pool) {
     return rows[0] ? toTicket(rows[0]) : null;
   }
 
+  // Activity log for a ticket, oldest first (spec: created_at ASC, id ASC).
+  // Shared by get() and the standalone listEvents().
+  async function loadEvents(ticketId: string): Promise<TicketEvent[]> {
+    const { rows } = await pool.query<EventRow>(
+      `SELECT id, actor_email, type, payload, created_at
+         FROM ticket_events WHERE ticket_id = $1 ORDER BY created_at ASC, id ASC`,
+      [ticketId],
+    );
+    return rows.map(toEvent);
+  }
+
   return {
     async list(filter?: ListFilter): Promise<Ticket[]> {
       const { rows } = filter?.requesterEmail
@@ -165,6 +178,17 @@ export function createTicketStore(pool: Pool) {
     },
 
     getById: loadById,
+
+    // Ticket detail at the store layer: the ticket plus its activity log
+    // (created_at ASC). A missing id is NotFoundError so the router maps it to
+    // NOT_FOUND without a nullable branch. Messages are a separate store; this
+    // get is the ticket + events pair the ticket-model tests pin.
+    async get(id: string): Promise<{ ticket: Ticket; events: TicketEvent[] }> {
+      const ticket = await loadById(id);
+      if (!ticket) throw new NotFoundError(id);
+      const events = await loadEvents(id);
+      return { ticket, events };
+    },
 
     // Keyset pagination (spec: specs/ticket-model.md): rows strictly after the
     // cursor position under the list ordering (created_at DESC, id DESC), i.e.
@@ -197,7 +221,8 @@ export function createTicketStore(pool: Pool) {
       const page = hasMore ? rows.slice(0, limit) : rows;
       const items = page.map(toTicket);
       const last = items[items.length - 1];
-      const nextCursor = hasMore && last ? encodeCursor(last.createdAt, last.id) : null;
+      const nextCursor =
+        hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null;
       return { items, nextCursor };
     },
 
@@ -250,7 +275,7 @@ export function createTicketStore(pool: Pool) {
     async setAssignee(
       id: string,
       assigneeEmail: string | null,
-      actorEmail: string,
+      actorEmail = "system",
     ): Promise<Ticket> {
       const current = await loadById(id);
       if (!current) throw new NotFoundError(id);
@@ -282,7 +307,7 @@ export function createTicketStore(pool: Pool) {
     // labels is a no-op success. A change swaps the join rows, writes
     // labels_changed (from/to name-sorted), and bumps updated_at in one
     // transaction.
-    async setLabels(id: string, labels: string[], actorEmail: string): Promise<Ticket> {
+    async setLabels(id: string, labels: string[], actorEmail = "system"): Promise<Ticket> {
       const current = await loadById(id);
       if (!current) throw new NotFoundError(id);
       const wanted = [...new Set(labels)];
@@ -323,15 +348,35 @@ export function createTicketStore(pool: Pool) {
       await pool.query(`UPDATE tickets SET updated_at = now() WHERE id = $1`, [id]);
     },
 
-    // Activity log for a ticket, oldest first (spec: created_at ASC, id ASC).
-    async listEvents(ticketId: string): Promise<TicketEvent[]> {
-      const { rows } = await pool.query<EventRow>(
-        `SELECT id, actor_email, type, payload, created_at
-           FROM ticket_events WHERE ticket_id = $1 ORDER BY created_at ASC, id ASC`,
-        [ticketId],
-      );
-      return rows.map(toEvent);
+    // Post a reply and bump the ticket's updated_at in one transaction (spec:
+    // reply は履歴対象外 — no event, just the message + the touch). Returns the
+    // created message. A missing parent ticket surfaces as NotFoundError via the
+    // FK violation, mirroring the message store's own contract.
+    async reply(input: ReplyStoreInput): Promise<Message> {
+      const body = replyBodySchema.parse(input.body);
+      return withTransaction(pool, async (client) => {
+        let message: Message;
+        try {
+          const { rows } = await client.query<MessageRow>(
+            `INSERT INTO messages (ticket_id, author_email, author_role, body)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, ticket_id, author_email, author_role, body, created_at`,
+            [input.ticketId, input.authorEmail, input.authorRole, body],
+          );
+          message = toMessage(rows[0]);
+        } catch (err) {
+          if (err instanceof Error && (err as { code?: string }).code === FK_VIOLATION) {
+            throw new NotFoundError(input.ticketId);
+          }
+          throw err;
+        }
+        await client.query(`UPDATE tickets SET updated_at = now() WHERE id = $1`, [input.ticketId]);
+        return message;
+      });
     },
+
+    // Activity log for a ticket, oldest first (spec: created_at ASC, id ASC).
+    listEvents: loadEvents,
 
     // Label catalogue, name-sorted (spec: tickets.labels).
     async labels(): Promise<Label[]> {
@@ -363,6 +408,31 @@ function toEvent(row: EventRow): TicketEvent {
     type: row.type,
     actorEmail: row.actor_email,
     payload: row.payload,
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
+// reply message helpers (mirror messages.ts): boundary body validation, the pg
+// FK-violation SQLSTATE for a missing parent ticket, and the Row→Message mapper.
+const replyBodySchema = z.string().min(1).max(2000);
+const FK_VIOLATION = "23503";
+
+type MessageRow = {
+  id: string;
+  ticket_id: string;
+  author_email: string;
+  author_role: MessageRole;
+  body: string;
+  created_at: Date;
+};
+
+function toMessage(row: MessageRow): Message {
+  return {
+    id: row.id,
+    ticketId: row.ticket_id,
+    authorEmail: row.author_email,
+    authorRole: row.author_role,
+    body: row.body,
     createdAt: row.created_at.toISOString(),
   };
 }
