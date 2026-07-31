@@ -176,7 +176,9 @@ const changedFiles = changedEntries?.map((e) => e.filename) ?? null;
 // ---- VRT baseline の変更(意図した UI 変更)を「変更前/変更後」で見せる ----
 // baseline PNG は PR の base / head 両方に存在するので、同一リポジトリ blob URL
 // だけで新旧を並べられる(追加ストレージ不要)。SHA は PR API から取る。
-const BASELINE_RE = /-snapshots\/.+\.png$/;
+// baseline は linux 限定(darwin はフォント差ノイズで追跡外)。万一 darwin が
+// 紛れ込んでも UI 変更として表示しない。
+const BASELINE_RE = /-snapshots\/.+-linux\.png$/;
 const changedBaselines = (changedEntries ?? []).filter((e) => BASELINE_RE.test(e.filename));
 function getPrShas() {
   if (DRY_RUN || changedBaselines.length === 0) return null;
