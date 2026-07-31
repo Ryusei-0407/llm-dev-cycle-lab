@@ -64,8 +64,14 @@ test.describe("passkey @feature-passkey", () => {
       });
 
       // 構造アサーション: サインイン後シェル(ユーザー表示 + Sign out)。role と順序
-      // のみ — コピーやレイアウト変更に耐える。
-      await expect(page.getByTestId("top-nav")).toMatchAriaSnapshot(`
+      // のみ — コピーやレイアウト変更に耐える。サインイン後の chrome は TopNav から
+      // App shell のサイドバーへ移った(specs/app-shell.md)。
+      // コンテナの存在確認を先に置く: toMatchAriaSnapshot は locator が不在でも
+      // パターンを広いツリーに対して照合してしまう(別所の "Sign out" ボタンで
+      // 成立する)ため、この可視チェックが testid 改名を固定する。無いと旧 top-nav
+      // のままでもアサーションが通ってしまう。
+      await expect(page.getByTestId("app-sidebar")).toBeVisible();
+      await expect(page.getByTestId("app-sidebar")).toMatchAriaSnapshot(`
       - button "Sign out"
     `);
     },
