@@ -72,14 +72,15 @@ export function TicketList({
   return (
     <div
       ref={scrollRef}
-      // The scroll element owns the virtual window. A fixed height constrains it
-      // so only the visible rows mount; without one it sizes to its content
-      // (the inner ul's total height) so clientHeight spans every row and the
-      // whole list renders — the fallback the component tests rely on.
+      // The scroll element owns the virtual window (and the ticket-list testid —
+      // tests treat ticket-list as the scrollable region). A fixed height
+      // constrains it so only the visible rows mount; without one it sizes to
+      // its content (the inner ul's total height) so clientHeight spans every
+      // row and the whole list renders — the fallback the component tests rely on.
+      data-testid="ticket-list"
       style={height != null ? { height, overflow: "auto" } : undefined}
     >
       <ul
-        data-testid="ticket-list"
         style={{ height: virtualizer.getTotalSize(), position: "relative" }}
         className="flex flex-col"
       >

@@ -84,9 +84,9 @@ test(
   async () => {
     await renderInRouter(<TicketList tickets={TICKETS} onStatusChange={vi.fn()} height={480} />);
 
-    // 先頭行は見える。
+    // 先頭行は見える(部分一致だと 10..19 等にも当たるため番号の直後を非数字に固定)。
     await expect
-      .element(page.getByTestId("ticket-row").filter({ hasText: "Bulk ticket 1" }))
+      .element(page.getByTestId("ticket-row").filter({ hasText: /Bulk ticket 1(?!\d)/ }))
       .toBeVisible();
     // 総数500に対し、実体化した行は大幅に少ない。
     expect(page.getByTestId("ticket-row").elements().length).toBeLessThan(50);

@@ -83,9 +83,10 @@ test.describe("app-shell @feature-app-shell", () => {
 
       await test.step("一覧を開き1ページ目が仮想化表示されることを確認する", async () => {
         await page.goto("/tickets");
-        // 1ページ目の先頭行が見える。
+        // 1ページ目の先頭行が見える(部分一致だと 10..19 等にも当たるため
+        // 番号の直後を非数字に固定)。
         await expect(
-          page.getByTestId("ticket-row").filter({ hasText: "Bulk ticket 1" }),
+          page.getByTestId("ticket-row").filter({ hasText: /Bulk ticket 1(?!\d)/ }),
         ).toBeVisible();
         // 仮想化: 総数(1ページ目だけでも50、末尾まで読めば60)より DOM 行数は
         // 大幅に少ない。可視ウィンドウ + オーバースキャンぶんだけが実体化する。

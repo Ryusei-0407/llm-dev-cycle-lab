@@ -40,7 +40,7 @@ export function AppShell({ user, children }: { user: User; children: React.React
   - `data-testid="nav-board"` — Link「Board」→ /board(**agent のみ**。customer には
     レンダリングしない — 既存 TopNav と同じ出し分け)
   - active なリンクは視覚的に区別(surface lift。詳細は自由)
-- 下端(mt-auto): 
+- 下端(mt-auto):
   - `data-testid="current-user"` — user.name
   - パスキー登録(既存 TopNav の移植。testid・文言は現状維持:
     `passkey-register` ボタン「パスキーを登録」/ `passkey-registered`
@@ -79,11 +79,11 @@ export function AppShell({ user, children }: { user: User; children: React.React
 
 ```ts
 export function TicketList({
-  tickets,          // 表示する全件(読み込み済みの平坦化済み配列)
+  tickets, // 表示する全件(読み込み済みの平坦化済み配列)
   onStatusChange,
   showStatusControl = true,
-  onEndReached,     // 可視末尾が末尾-5行に達するたび呼ばれる(省略可)
-  height,           // スクロール領域の高さ(px)。省略時は親の高さに従う
+  onEndReached, // 可視末尾が末尾-5行に達するたび呼ばれる(省略可)
+  height, // スクロール領域の高さ(px)。省略時は親の高さに従う
 }: {
   tickets: Ticket[];
   onStatusChange: (id: string, status: TicketStatus) => void;

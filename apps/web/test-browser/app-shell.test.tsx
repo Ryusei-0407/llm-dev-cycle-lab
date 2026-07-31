@@ -7,6 +7,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 import { AppShell } from "@/components/app-shell";
@@ -63,7 +64,13 @@ async function renderInRouter(element: React.ReactNode) {
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });
   await router.load();
-  return render(<RouterProvider router={router} />);
+  // AppShell は useRealtimeInvalidation 経由で QueryClient を要求する
+  // (実アプリのマウント前提と同じ)。
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 test(
