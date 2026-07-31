@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, redirect, useLoaderData } from "@tanstack/react-router";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { fetchMe } from "@/auth/api";
-import { TopNav } from "@/auth/TopNav";
+import { AppShell } from "@/components/app-shell";
 import { TicketList } from "@/components/ticket-list";
 import { useSessionUser } from "@/lib/session";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets";
@@ -27,10 +27,9 @@ export const Route = createFileRoute("/tickets")({
 function TicketsRoute() {
   const { user } = useLoaderData({ from: "/tickets" });
   return (
-    <div className="flex min-h-dvh flex-col">
-      <TopNav user={user} />
+    <AppShell user={user}>
       <TicketsPage />
-    </div>
+    </AppShell>
   );
 }
 
@@ -40,6 +39,9 @@ const PRIORITY_OPTIONS: { value: TicketPriority; label: string }[] = [
   { value: "high", label: "High" },
 ];
 
+// Page size for the cursor-paginated list (spec: limit 50).
+const PAGE_LIMIT = 50;
+
 function TicketsPage() {
   const queryClient = useQueryClient();
   // Agent-only status control is hidden for the customer session
@@ -47,25 +49,50 @@ function TicketsPage() {
   // customer's own tickets, so the rows themselves are unchanged.
   const isAgent = useSessionUser()?.role === "agent";
 
-  // Surface load failures immediately (data-testid="tickets-load-error") instead
-  // of sitting through React Query's default retry/backoff.
-  const ticketsQuery = useQuery({ ...orpc.tickets.list.queryOptions(), retry: false });
+  // Cursor pagination via listPage (spec: specs/app-shell.md). Pages carry
+  // { items, nextCursor }; the pageParam is the cursor (undefined for page 1).
+  // retry:false surfaces load failures immediately (tickets-load-error) rather
+  // than sitting through React Query's backoff.
+  const listQuery = useInfiniteQuery({
+    ...orpc.tickets.listPage.infiniteOptions({
+      input: (cursor: string | undefined) => ({ cursor, limit: PAGE_LIMIT }),
+      initialPageParam: undefined as string | undefined,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    }),
+    retry: false,
+  });
+
+  // Flatten loaded pages into the display list; server order (created_at DESC)
+  // is preserved — no client re-sort (spec).
+  const tickets = listQuery.data?.pages.flatMap((page) => page.items) ?? [];
+
+  const invalidateList = () =>
+    queryClient.invalidateQueries({ queryKey: orpc.tickets.listPage.key() });
 
   const createMutation = useMutation(
-    orpc.tickets.create.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.tickets.list.queryKey() }),
-    }),
+    orpc.tickets.create.mutationOptions({ onSuccess: invalidateList }),
   );
   const setStatusMutation = useMutation(
-    orpc.tickets.setStatus.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.tickets.list.queryKey() }),
-    }),
+    orpc.tickets.setStatus.mutationOptions({ onSuccess: invalidateList }),
   );
 
   const [showForm, setShowForm] = useState(false);
   const [subject, setSubject] = useState("");
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [formError, setFormError] = useState<string | null>(null);
+
+  // The virtualizer needs a concrete scroll-region height; measure the flex-1
+  // list area so it fills the remaining pane height and reflows on resize.
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const [listHeight, setListHeight] = useState<number>(0);
+  useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setListHeight(el.clientHeight));
+    observer.observe(el);
+    setListHeight(el.clientHeight);
+    return () => observer.disconnect();
+  }, []);
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -92,8 +119,16 @@ function TicketsPage() {
     setStatusMutation.mutate({ id, status });
   };
 
+  // Infinite scroll (spec): fetch the next page when the visible tail nears the
+  // loaded count, but only when there is one and no fetch is in flight.
+  const onEndReached = () => {
+    if (listQuery.hasNextPage && !listQuery.isFetching) {
+      void listQuery.fetchNextPage();
+    }
+  };
+
   return (
-    <main className="mx-auto flex min-h-dvh max-w-5xl flex-col gap-4 p-4">
+    <main className="flex h-full flex-col gap-4 px-6 py-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Tickets</h1>
         <Button type="button" onClick={() => setShowForm((v) => !v)}>
@@ -137,16 +172,20 @@ function TicketsPage() {
         </form>
       )}
 
-      {ticketsQuery.isError ? (
+      {listQuery.isError ? (
         <p data-testid="tickets-load-error" role="alert" className="text-sm text-destructive">
           Failed to load tickets.
         </p>
       ) : (
-        <TicketList
-          tickets={ticketsQuery.data ?? []}
-          onStatusChange={onStatusChange}
-          showStatusControl={isAgent}
-        />
+        <div ref={scrollAreaRef} className="min-h-0 flex-1">
+          <TicketList
+            tickets={tickets}
+            onStatusChange={onStatusChange}
+            showStatusControl={isAgent}
+            onEndReached={onEndReached}
+            height={listHeight || undefined}
+          />
+        </div>
       )}
     </main>
   );

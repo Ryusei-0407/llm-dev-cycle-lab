@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { fetchMe } from "@/auth/api";
-import { TopNav } from "@/auth/TopNav";
+import { AppShell } from "@/components/app-shell";
 import { DraftPanel } from "@/components/draft-panel";
 import { MessageThread } from "@/components/message-thread";
 import { StatusBadge } from "@/components/status-badge";
@@ -27,10 +27,9 @@ export const Route = createFileRoute("/tickets_/$id")({
 function TicketDetailRoute() {
   const { user } = Route.useLoaderData();
   return (
-    <div className="flex min-h-dvh flex-col">
-      <TopNav user={user} />
+    <AppShell user={user}>
       <TicketDetailPage />
-    </div>
+    </AppShell>
   );
 }
 
@@ -86,7 +85,7 @@ function TicketDetailPage() {
 
   if (detailQuery.isError) {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 p-4">
+      <main className="flex h-full max-w-3xl flex-col gap-4 overflow-auto p-4">
         {isForbidden(detailQuery.error) ? (
           <p
             data-testid="ticket-forbidden"
@@ -113,7 +112,7 @@ function TicketDetailPage() {
   const events = detailQuery.data?.events ?? [];
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 p-4">
+    <main className="flex h-full max-w-3xl flex-col gap-4 overflow-auto p-4">
       {ticket && (
         <div className="flex items-center gap-3">
           <span data-testid="ticket-number" className="text-sm text-ink-subtle tabular-nums">
