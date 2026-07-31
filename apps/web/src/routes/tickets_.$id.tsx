@@ -141,8 +141,10 @@ function TicketDetailPage() {
 
       {ticket && isAgent && (
         <div className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 p-4">
-          <StatusControl ticketId={id} status={ticket.status} />
-          <AssigneeControl ticketId={id} assigneeEmail={ticket.assigneeEmail ?? null} />
+          <div className="flex items-center gap-3">
+            <StatusControl ticketId={id} status={ticket.status} />
+            <AssigneeControl ticketId={id} assigneeEmail={ticket.assigneeEmail ?? null} />
+          </div>
           <LabelControl ticketId={id} labels={ticket.labels ?? []} />
         </div>
       )}
@@ -213,7 +215,7 @@ function StatusControl({
       aria-label="Status"
       value={status}
       onChange={(e) => setStatus.mutate({ id: ticketId, status: e.target.value as typeof status })}
-      className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="h-8 w-44 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <option value="open">Open</option>
       <option value="in_progress">In progress</option>
@@ -250,7 +252,7 @@ function AssigneeControl({
       aria-label="Assignee"
       value={assigneeEmail ?? ""}
       onChange={(e) => setAssignee.mutate({ id: ticketId, assigneeEmail: e.target.value || null })}
-      className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="h-8 w-44 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <option value="">未割り当て</option>
       {agents.map((agent) => (

@@ -72,7 +72,8 @@ function StoryRouter({ children }: { children: React.ReactNode }) {
 // VRT カタログストーリー: 3ステータスの行を1枚で。
 export const VisualCatalog = () => (
   <StoryRouter>
-    <div className="max-w-3xl bg-background p-6">
+    {/* 行は固定幅カラムのグリッドなので、カタログも実画面相当の幅で撮る。 */}
+    <div className="w-[60rem] bg-background p-6">
       <TicketList tickets={TICKETS} onStatusChange={() => {}} />
     </div>
   </StoryRouter>

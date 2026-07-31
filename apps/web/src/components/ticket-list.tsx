@@ -35,7 +35,11 @@ export function TicketList({
         <li
           key={ticket.id}
           data-testid="ticket-row"
-          className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3"
+          // 固定幅カラムのグリッド(PC 前提)。flex の内容依存幅だと文字列長で
+          // 各カラムの横位置が行ごとに揺れるため、subject 以外は幅を固定して
+          // 縦のラインを揃える。customer 表示ではセレクト列は空のまま保持し、
+          // ロール差でレイアウトが変わらないようにする。
+          className="grid grid-cols-[3.5rem_minmax(0,1fr)_9rem_5.5rem_6.5rem_4.5rem_8.5rem] items-center gap-3 rounded-lg border border-border bg-card px-4 py-3"
         >
           {/* A semantic router Link (renders <a role=link>): keyboard-focusable
               and it navigates in-app (SPA) rather than a full-document load.
@@ -48,11 +52,11 @@ export function TicketList({
             data-testid="ticket-link"
             to="/tickets/$id"
             params={{ id: ticket.id }}
-            className="flex-1 truncate text-sm text-card-foreground transition-colors hover:text-primary-hover"
+            className="truncate text-sm text-card-foreground transition-colors hover:text-primary-hover"
           >
             {ticket.subject}
           </Link>
-          <span data-testid="ticket-labels" className="flex items-center gap-1">
+          <span data-testid="ticket-labels" className="flex items-center gap-1 overflow-hidden">
             {(ticket.labels ?? []).map((label) => (
               <span
                 key={label.name}
@@ -64,18 +68,20 @@ export function TicketList({
               </span>
             ))}
           </span>
-          <span data-testid="ticket-assignee" className="text-xs text-ink-subtle">
+          <span data-testid="ticket-assignee" className="truncate text-xs text-ink-subtle">
             {assigneeLabel(ticket.assigneeEmail ?? null)}
           </span>
-          <StatusBadge status={ticket.status} />
+          <span>
+            <StatusBadge status={ticket.status} />
+          </span>
           <span className="text-xs text-ink-subtle capitalize">{ticket.priority}</span>
-          {showStatusControl && (
+          {showStatusControl ? (
             <select
               data-testid="ticket-status-select"
               aria-label={`Status for ${ticket.subject}`}
               value={ticket.status}
               onChange={(e) => onStatusChange(ticket.id, e.target.value as TicketStatus)}
-              className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               {STATUS_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -83,6 +89,8 @@ export function TicketList({
                 </option>
               ))}
             </select>
+          ) : (
+            <span />
           )}
         </li>
       ))}
