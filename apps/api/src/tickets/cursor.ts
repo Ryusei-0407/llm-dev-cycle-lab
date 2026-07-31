@@ -8,6 +8,11 @@ import { BadRequestError } from "./store.js";
 
 export type CursorPosition = { createdAt: string; id: string };
 
+// id は SQL 側で ::uuid キャストされる。形状検証を通しておかないと、偽造
+// トークンの非 uuid id が pg のキャストエラー(=500)に化けて仕様の
+// BAD_REQUEST "invalid cursor" を破る(敵対的レビューの反例)。
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function encodeCursor({ createdAt, id }: CursorPosition): string {
   return Buffer.from(`${createdAt}|${id}`, "utf8").toString("base64url");
 }
@@ -23,8 +28,10 @@ export function decodeCursor(cursor: string): CursorPosition {
   if (sep < 0) throw new BadRequestError("invalid cursor");
   const createdAt = decoded.slice(0, sep);
   const id = decoded.slice(sep + 1);
-  // A valid token always carries a parseable ISO timestamp and a non-empty id;
+  // A valid token always carries a parseable ISO timestamp and a uuid id;
   // anything else is a forged/corrupt cursor.
-  if (!id || Number.isNaN(Date.parse(createdAt))) throw new BadRequestError("invalid cursor");
+  if (!UUID.test(id) || Number.isNaN(Date.parse(createdAt))) {
+    throw new BadRequestError("invalid cursor");
+  }
   return { createdAt, id };
 }

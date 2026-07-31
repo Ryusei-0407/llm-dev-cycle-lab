@@ -479,6 +479,29 @@ describe("ticket-model: listPage キーセットページネーション (HTTP�
   );
 
   it(
+    "listPage は base64url は妥当だが id が uuid でない偽造カーソルも BAD_REQUEST で拒否する",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "敵対的レビューの反例の固定: 正当な base64url・正当な ISO 日付・非 uuid の id を持つトークンが SQL の ::uuid キャストへ到達して 500 になる経路を塞ぎ、400 'invalid cursor' で拒否されることを検証",
+      },
+    },
+    async () => {
+      const app = createApp();
+      const cookie = await cookieFor(app, SEED.agent);
+      const forged = Buffer.from("2026-01-01T00:00:00.000Z|not-a-uuid", "utf8").toString(
+        "base64url",
+      );
+      const res = await rpc(app, "listPage", { cursor: forged }, cookie);
+      expect(res.status).toBe(400);
+      const err = unwrap(await res.json()) as { code?: string; message?: string };
+      expect(err.code).toBe("BAD_REQUEST");
+      expect(err.message).toBe("invalid cursor");
+    },
+  );
+
+  it(
     "listPage は limit 範囲外(0)を zod で 400 拒否する",
     {
       annotation: {
