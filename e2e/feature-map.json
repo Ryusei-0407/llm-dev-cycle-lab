@@ -65,5 +65,6 @@
     "apps/web/src/auth/TopNav.tsx",
     "e2e/helpers/webauthn.ts"
   ],
-  "visual": ["apps/web/src/**", "e2e/tests/visual.spec.ts", "e2e/components/visual.spec.ts"]
+  "visual": ["apps/web/src/**", "e2e/tests/visual.spec.ts", "e2e/components/visual.spec.ts"],
+  "app-shell": ["apps/web/src/**", "e2e/tests/app-shell.spec.ts"]
 }

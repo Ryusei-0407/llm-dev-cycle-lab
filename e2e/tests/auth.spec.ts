@@ -39,8 +39,14 @@ test.describe("auth @feature-auth", () => {
       });
 
       // Structural assertion: the signed-in shell (user identity + sign-out),
-      // roles and order only — survives copy and layout changes.
-      await expect(page.getByTestId("top-nav")).toMatchAriaSnapshot(`
+      // roles and order only — survives copy and layout changes. The signed-in
+      // chrome moved from TopNav to the App shell sidebar (specs/app-shell.md).
+      // The container must exist first: toMatchAriaSnapshot on a missing locator
+      // still matches the pattern against the wider tree (a "Sign out" button
+      // elsewhere satisfies it), so the visibility check is what pins the
+      // testid rename — without it the assertion passes on the old top-nav.
+      await expect(page.getByTestId("app-sidebar")).toBeVisible();
+      await expect(page.getByTestId("app-sidebar")).toMatchAriaSnapshot(`
       - button "Sign out"
     `);
     },
