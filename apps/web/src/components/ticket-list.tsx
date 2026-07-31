@@ -8,6 +8,15 @@ const STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [
   { value: "resolved", label: "Resolved" },
 ];
 
+// Assignee display (spec: specs/ticket-model.md 一覧). The row shows the local
+// part of the assignee email (agent@example.com → agent); unassigned renders the
+// en-dash placeholder.
+function assigneeLabel(email: string | null): string {
+  if (!email) return "–";
+  const at = email.indexOf("@");
+  return at > 0 ? email.slice(0, at) : email;
+}
+
 export function TicketList({
   tickets,
   onStatusChange,
@@ -32,6 +41,9 @@ export function TicketList({
               and it navigates in-app (SPA) rather than a full-document load.
               Mounting TicketList now requires a router context, so
               ticket-status.test.tsx wraps it in a memory router. */}
+          <span data-testid="ticket-number" className="text-xs text-ink-subtle tabular-nums">
+            SUP-{ticket.number}
+          </span>
           <Link
             data-testid="ticket-link"
             to="/tickets/$id"
@@ -40,6 +52,21 @@ export function TicketList({
           >
             {ticket.subject}
           </Link>
+          <span data-testid="ticket-labels" className="flex items-center gap-1">
+            {(ticket.labels ?? []).map((label) => (
+              <span
+                key={label.name}
+                data-testid="ticket-label"
+                className="rounded px-1.5 py-0.5 text-xs font-medium text-white"
+                style={{ backgroundColor: label.color }}
+              >
+                {label.name}
+              </span>
+            ))}
+          </span>
+          <span data-testid="ticket-assignee" className="text-xs text-ink-subtle">
+            {assigneeLabel(ticket.assigneeEmail ?? null)}
+          </span>
           <StatusBadge status={ticket.status} />
           <span className="text-xs text-ink-subtle capitalize">{ticket.priority}</span>
           {showStatusControl && (
