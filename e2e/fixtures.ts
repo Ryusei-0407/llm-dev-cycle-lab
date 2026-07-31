@@ -44,13 +44,23 @@ export const test = base.extend<{ stepNarration: void }>({
       const hooks = testInfo as unknown as StepHooks;
       const stack: string[] = [];
       let handle: OverlayHandle | undefined;
+      // 録画はタブ生成直後(about:blank の白画面)から始まる。その時点で
+      // ステップ名だけ重ねると「白画面のまま操作している」ように見えるため、
+      // 最初の実ページの DOM 構築完了までオーバーレイを保留する。
+      let painted = false;
       const render = async () => {
         await handle?.dispose().catch(() => {});
         handle = undefined;
         const title = stack.at(-1);
-        if (!title) return;
+        if (!title || !painted) return;
         handle = await screencast.showOverlay(overlayHtml(title)).catch(() => undefined);
       };
+      page.on("domcontentloaded", () => {
+        if (!painted && page.url() !== "about:blank") {
+          painted = true;
+          void render();
+        }
+      });
       hooks._onUserStepBegin = async (title) => {
         stack.push(title);
         await render();
