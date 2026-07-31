@@ -91,6 +91,16 @@ test.describe("app-shell @feature-app-shell", () => {
         // 仮想化: 総数(1ページ目だけでも50、末尾まで読めば60)より DOM 行数は
         // 大幅に少ない。可視ウィンドウ + オーバースキャンぶんだけが実体化する。
         expect(await page.getByTestId("ticket-row").count()).toBeLessThan(40);
+        // 敵対的レビューの反例の固定: クライアントで並べ替えるミューテーション
+        // (subject の辞書順ソート等)が全テストを通過していた。先頭の行列が
+        // サーバ返却順そのままであることをアサートする(辞書順なら 1 の次は 10)。
+        expect((await page.getByTestId("ticket-link").allTextContents()).slice(0, 5)).toEqual([
+          "Bulk ticket 1",
+          "Bulk ticket 2",
+          "Bulk ticket 3",
+          "Bulk ticket 4",
+          "Bulk ticket 5",
+        ]);
         await snap(page, testInfo, "1ページ目");
       });
 
@@ -104,6 +114,12 @@ test.describe("app-shell @feature-app-shell", () => {
         ).toBeVisible();
         // 2ページ読み込み後も仮想化は維持される(全60行は実体化しない)。
         expect(await page.getByTestId("ticket-row").count()).toBeLessThan(40);
+        // 順序固定の続き: ページ境界をまたいでもサーバ順(…58, 59, 60)のまま。
+        expect((await page.getByTestId("ticket-link").allTextContents()).slice(-3)).toEqual([
+          "Bulk ticket 58",
+          "Bulk ticket 59",
+          "Bulk ticket 60",
+        ]);
         await snap(page, testInfo, "2ページ目到達");
       });
 
