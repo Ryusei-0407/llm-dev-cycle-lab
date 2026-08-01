@@ -55,6 +55,13 @@ export const listPageInput = z.object({
   unresolved: z.boolean().optional(),
 });
 
+// command-palette search (spec: specs/command-palette.md). q is trimmed then
+// bounded to 1..100 chars, so a whitespace-only query rejects as empty. The
+// number-vs-subject decision lives in the store, not zod.
+export const searchInput = z.object({
+  q: z.string().trim().min(1).max(100),
+});
+
 export type CreateInput = z.infer<typeof createInput>;
 export type SetStatusInput = z.infer<typeof setStatusInput>;
 export type GetInput = z.infer<typeof getInput>;
@@ -62,3 +69,4 @@ export type ReplyInput = z.infer<typeof replyInput>;
 export type SetAssigneeInput = z.infer<typeof setAssigneeInput>;
 export type SetLabelsInput = z.infer<typeof setLabelsInput>;
 export type ListPageInput = z.infer<typeof listPageInput>;
+export type SearchInput = z.infer<typeof searchInput>;

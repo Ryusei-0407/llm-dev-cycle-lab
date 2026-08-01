@@ -8,6 +8,7 @@ import {
   getInput,
   listPageInput,
   replyInput,
+  searchInput,
   setAssigneeInput,
   setLabelsInput,
   setStatusInput,
@@ -133,6 +134,18 @@ export function createTicketsRouter(hub: RealtimeHub) {
       return user.role === "agent"
         ? getStore().list()
         : getStore().list({ requesterEmail: user.email });
+    }),
+
+    // command-palette search (spec: specs/command-palette.md). Role scope mirrors
+    // list: an agent searches every ticket; a customer is pinned to their own via
+    // the store's requesterEmail filter. Session required. No match is an empty
+    // array (the store contract), never an error.
+    search: base.input(searchInput).handler(({ input, context }) => {
+      const user = requireUser(context.user);
+      return getStore().search({
+        q: input.q,
+        requesterEmail: user.role === "agent" ? undefined : user.email,
+      });
     }),
 
     create: base
