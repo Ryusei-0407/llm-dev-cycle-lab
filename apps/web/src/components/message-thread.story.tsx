@@ -1,6 +1,6 @@
 import { MessageThread } from "./message-thread";
 
-// VRT カタログストーリー: 顧客/担当者の両ロールの吹き出しを1枚で。
+// VRT カタログストーリー: 全幅統一行(顧客/担当者)+ 差し込まれたイベント行を1枚で。
 export const VisualCatalog = () => (
   <div className="max-w-3xl bg-background p-6">
     <MessageThread
@@ -20,6 +20,15 @@ export const VisualCatalog = () => (
           authorRole: "agent",
           body: "Thanks for the report — a fix is rolling out within the hour.",
           createdAt: "2026-07-01T09:10:00.000Z",
+        },
+      ]}
+      events={[
+        {
+          id: "e1",
+          type: "status_changed",
+          actorEmail: "aki@example.com",
+          payload: { from: "open", to: "in_progress" },
+          createdAt: "2026-07-01T09:05:00.000Z",
         },
       ]}
     />
