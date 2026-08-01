@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, redirect, useLoaderData } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { fetchMe } from "@/auth/api";
@@ -10,11 +10,42 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { orpc } from "@/lib/orpc";
 
+// Filter state lives in the URL search params (spec: specs/triage.md) so a
+// filtered list is reload- and share-safe. Each field is optional; an unknown
+// enum or a blank string drops to undefined so the URL never carries a filter
+// the API would reject, and "no filter" is simply the absence of the key.
+type TicketSearch = {
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  label?: string;
+};
+
+const STATUS_VALUES: TicketStatus[] = ["open", "in_progress", "resolved"];
+const PRIORITY_VALUES: TicketPriority[] = ["low", "medium", "high"];
+
+function validateSearch(search: Record<string, unknown>): TicketSearch {
+  const status = search.status;
+  const priority = search.priority;
+  const label = search.label;
+  return {
+    status:
+      typeof status === "string" && STATUS_VALUES.includes(status as TicketStatus)
+        ? (status as TicketStatus)
+        : undefined,
+    priority:
+      typeof priority === "string" && PRIORITY_VALUES.includes(priority as TicketPriority)
+        ? (priority as TicketPriority)
+        : undefined,
+    label: typeof label === "string" && label.length > 0 ? label : undefined,
+  };
+}
+
 // Auth guard: /tickets is a protected route, so resolve the session in
 // beforeLoad and redirect unauthenticated visitors to /login before any ticket
 // UI mounts — same mechanism as the home route (specs/auth.md, specs/tickets.md
 // integration note).
 export const Route = createFileRoute("/tickets")({
+  validateSearch,
   beforeLoad: async () => {
     const user = await fetchMe();
     if (!user) throw redirect({ to: "/login" });
@@ -39,8 +70,19 @@ const PRIORITY_OPTIONS: { value: TicketPriority; label: string }[] = [
   { value: "high", label: "High" },
 ];
 
+const STATUS_FILTER_OPTIONS: { value: TicketStatus; label: string }[] = [
+  { value: "open", label: "Open" },
+  { value: "in_progress", label: "In progress" },
+  { value: "resolved", label: "Resolved" },
+];
+
 // Page size for the cursor-paginated list (spec: limit 50).
 const PAGE_LIMIT = 50;
+
+// Shared style for the header filter selects; matches the New-ticket form's
+// priority select so the two controls read as one control family.
+const FILTER_SELECT_CLASS =
+  "h-8 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 function TicketsPage() {
   const queryClient = useQueryClient();
@@ -49,13 +91,44 @@ function TicketsPage() {
   // customer's own tickets, so the rows themselves are unchanged.
   const isAgent = useSessionUser()?.role === "agent";
 
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const hasFilter = !!(search.status || search.priority || search.label);
+
+  // Merge one changed filter into the URL search params (spec: フィルタ値は URL
+  // search params). An empty selection clears that key. TanStack Router's
+  // validateSearch normalises the result, and because the infinite query keys on
+  // these values the cursor is dropped and the list re-fetches from page 1.
+  const setFilter = (patch: Partial<TicketSearch>) => {
+    void navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+  };
+
+  // Label catalogue for the filter select (spec: tickets.labels). Fetched for
+  // agents only: the repo keeps a customer session off tickets.labels/agents (the
+  // detail panel gates the same way, and customer-portal/detail-panel E2E count
+  // those requests). A customer still sees the filter-label control, with only
+  // the "すべて" option.
+  const labelsQuery = useQuery({
+    ...orpc.tickets.labels.queryOptions(),
+    enabled: isAgent,
+    retry: false,
+  });
+
   // Cursor pagination via listPage (spec: specs/app-shell.md). Pages carry
   // { items, nextCursor }; the pageParam is the cursor (undefined for page 1).
   // retry:false surfaces load failures immediately (tickets-load-error) rather
-  // than sitting through React Query's backoff.
+  // than sitting through React Query's backoff. The active filters are part of
+  // the query input, so they key the cache — changing a filter drops the old
+  // pages (and the cursor) and starts over from page 1 (spec).
   const listQuery = useInfiniteQuery({
     ...orpc.tickets.listPage.infiniteOptions({
-      input: (cursor: string | undefined) => ({ cursor, limit: PAGE_LIMIT }),
+      input: (cursor: string | undefined) => ({
+        cursor,
+        limit: PAGE_LIMIT,
+        status: search.status,
+        priority: search.priority,
+        label: search.label,
+      }),
       initialPageParam: undefined as string | undefined,
       getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     }),
@@ -171,6 +244,65 @@ function TicketsPage() {
           )}
         </form>
       )}
+
+      {/* Server-side filter bar (spec: specs/triage.md). Empty option ("") is
+          "all"; selecting it clears that filter. unassigned は受信トレイ専用なので
+          ここには出さない。両ロールで使える。 */}
+      <div className="flex items-center gap-3">
+        <select
+          data-testid="filter-status"
+          aria-label="Filter by status"
+          value={search.status ?? ""}
+          onChange={(e) => setFilter({ status: (e.target.value || undefined) as TicketStatus })}
+          className={FILTER_SELECT_CLASS}
+        >
+          <option value="">すべて</option>
+          {STATUS_FILTER_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <select
+          data-testid="filter-priority"
+          aria-label="Filter by priority"
+          value={search.priority ?? ""}
+          onChange={(e) => setFilter({ priority: (e.target.value || undefined) as TicketPriority })}
+          className={FILTER_SELECT_CLASS}
+        >
+          <option value="">すべて</option>
+          {PRIORITY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <select
+          data-testid="filter-label"
+          aria-label="Filter by label"
+          value={search.label ?? ""}
+          onChange={(e) => setFilter({ label: e.target.value || undefined })}
+          className={FILTER_SELECT_CLASS}
+        >
+          <option value="">すべて</option>
+          {(labelsQuery.data ?? []).map((label) => (
+            <option key={label.name} value={label.name}>
+              {label.name}
+            </option>
+          ))}
+        </select>
+        {hasFilter && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="filter-clear"
+            onClick={() => navigate({ search: {}, replace: true })}
+          >
+            クリア
+          </Button>
+        )}
+      </div>
 
       {listQuery.isError ? (
         <p data-testid="tickets-load-error" role="alert" className="text-sm text-destructive">

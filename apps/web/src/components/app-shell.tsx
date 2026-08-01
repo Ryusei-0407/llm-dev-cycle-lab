@@ -1,8 +1,10 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import type { User } from "@/auth/api";
 import { logout, registerPasskey } from "@/auth/api";
 import { Button } from "@/components/ui/button";
+import { orpc } from "@/lib/orpc";
 import { useRealtimeInvalidation } from "@/lib/realtime";
 import { supportsPasskeys } from "@/lib/webauthn";
 
@@ -16,6 +18,19 @@ export function AppShell({ user, children }: { user: User; children: React.React
   const router = useRouter();
   useRealtimeInvalidation();
   const [passkeyState, setPasskeyState] = useState<"idle" | "registered" | "error">("idle");
+
+  // Inbox badge count (spec: specs/triage.md). Agent-only: the enabled guard
+  // stops a customer session from ever calling the agent-only procedure (which
+  // would 403), mirroring the detail panel's agents/labels fetch. WS
+  // ticket.created/updated invalidate this key alongside the lists
+  // (lib/realtime.ts), so the badge tracks the inbox without a manual refetch.
+  const isAgent = user.role === "agent";
+  const inboxCountQuery = useQuery({
+    ...orpc.tickets.inboxCount.queryOptions(),
+    enabled: isAgent,
+    retry: false,
+  });
+  const inboxCount = inboxCountQuery.data ?? 0;
 
   const onSignOut = async () => {
     await logout();
@@ -34,6 +49,26 @@ export function AppShell({ user, children }: { user: User; children: React.React
         className="flex w-60 flex-col gap-1 border-r border-border px-3 py-4"
       >
         <span className="mb-4 px-2 text-sm font-semibold tracking-tight">サポートデスク</span>
+        {/* Inbox is agent-only (specs/triage.md); a customer never sees the link
+            and is turned away at /inbox by inbox-forbidden — same出し分け as the
+            board. The count badge is hidden while the inbox is empty. */}
+        {isAgent && (
+          <Link
+            data-testid="nav-inbox"
+            to="/inbox"
+            className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground [&.active]:bg-surface-1 [&.active]:text-foreground"
+          >
+            受信トレイ
+            {inboxCount > 0 && (
+              <span
+                data-testid="inbox-count"
+                className="rounded-full bg-surface-2 px-1.5 text-xs tabular-nums text-foreground"
+              >
+                {inboxCount}
+              </span>
+            )}
+          </Link>
+        )}
         <Link
           data-testid="nav-tickets"
           to="/tickets"
