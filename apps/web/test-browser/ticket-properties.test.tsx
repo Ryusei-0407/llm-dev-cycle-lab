@@ -92,6 +92,11 @@ test(
     // ラベルトグル: 未付与の "billing" を押すと既存 api を含む全置換配列で呼ぶ。
     await page.getByTestId("label-toggle-billing").click();
     expect(onLabelsChange).toHaveBeenLastCalledWith(expect.arrayContaining(["api", "billing"]));
+
+    // 敵対的レビューの反例の固定: 解除方向。付与済み "api" のトグルを押すと
+    // api を含まない全置換配列で呼ぶ(add-only 化ミューテーションを殺す)。
+    await page.getByTestId("label-toggle-api").click();
+    expect(onLabelsChange).toHaveBeenLastCalledWith(expect.not.arrayContaining(["api"]));
   },
 );
 

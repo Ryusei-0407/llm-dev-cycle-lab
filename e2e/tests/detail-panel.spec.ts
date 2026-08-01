@@ -126,6 +126,15 @@ test.describe("detail-panel (customer) over oRPC @feature-detail-panel", () => {
       // customer 所有(customer-portal.spec の前提と同じく seed は全て customer 所有)。
       const subject = "Cannot login to dashboard";
 
+      // 仕様 MUST「customer は tickets.agents / tickets.labels を呼ばない」の固定
+      // (agents は agent 専用 API — 呼べば 403 が握り潰されるだけでテストを
+      // すり抜ける、という敵対的レビューの指摘)。リクエスト到達数を数える。
+      let agentOnlyCalls = 0;
+      await page.route("**/api/rpc/tickets/{agents,labels}", (route) => {
+        agentOnlyCalls += 1;
+        return route.continue();
+      });
+
       await test.step("顧客としてラベル付きのシードチケットを開く", async () => {
         await page.goto("/tickets");
         await expect(page.getByTestId("ticket-row").filter({ hasText: subject })).toBeVisible();
@@ -151,6 +160,8 @@ test.describe("detail-panel (customer) over oRPC @feature-detail-panel", () => {
         await expect(panel.getByTestId("ticket-status-select")).toHaveCount(0);
         await expect(panel.getByTestId("assignee-select")).toHaveCount(0);
         await expect(panel.getByTestId(/^label-toggle-/)).toHaveCount(0);
+        // agent 専用エンドポイントへのリクエストが1件も飛んでいないこと。
+        expect(agentOnlyCalls).toBe(0);
         await snap(page, testInfo, "コントロール不在");
       });
     },
