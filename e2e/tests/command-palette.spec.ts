@@ -83,12 +83,16 @@ test.describe("command-palette @feature-command-palette", () => {
       await test.step("パレットの構造(role と順序)を固定する", async () => {
         await openPalette(page);
         await expect(page.getByTestId("command-palette")).toBeVisible();
+        // 実ツリーは dialog > (combobox入力) + listbox > group > option。
+        // ローカルは ignoreSnapshots で aria snapshot もスキップされるため、
+        // テンプレート検証は CI=1 実行で行うこと(通常ローカルでは素通り)。
         await expect(page.getByTestId("command-palette")).toMatchAriaSnapshot(`
           - dialog:
-            - textbox
-            - option "受信トレイ"
-            - option "Tickets"
-            - option "Board"
+            - listbox:
+              - group:
+                - option "受信トレイ"
+                - option "Tickets"
+                - option "Board"
         `);
         await snap(page, testInfo, "パレット構造");
       });
