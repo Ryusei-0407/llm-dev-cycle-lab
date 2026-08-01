@@ -124,30 +124,29 @@ export function TicketProperties({
 
         <Row label="ラベル">
           {isAgent ? (
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                {labelCatalog.map((label) => {
-                  const on = active.has(label.name);
-                  return (
-                    <button
-                      key={label.name}
-                      type="button"
-                      data-testid={`label-toggle-${label.name}`}
-                      aria-pressed={on}
-                      onClick={() => toggle(label.name)}
-                      className="rounded px-2 py-0.5 text-xs font-medium transition-opacity"
-                      style={{
-                        backgroundColor: label.color,
-                        color: "#fff",
-                        opacity: on ? 1 : 0.35,
-                      }}
-                    >
-                      {label.name}
-                    </button>
-                  );
-                })}
-              </div>
-              {labelChips}
+            // トグルが現在値表示を兼ねる(付与中 = 不透明 + ticket-label)。
+            // 別行のチップ表示を重ねると同じラベルが二重に見えるため置かない。
+            <div data-testid="ticket-labels" className="flex flex-wrap items-center gap-2">
+              {labelCatalog.map((label) => {
+                const on = active.has(label.name);
+                return (
+                  <button
+                    key={label.name}
+                    type="button"
+                    data-testid={`label-toggle-${label.name}`}
+                    aria-pressed={on}
+                    onClick={() => toggle(label.name)}
+                    className="rounded px-2 py-0.5 text-xs font-medium transition-opacity"
+                    style={{
+                      backgroundColor: label.color,
+                      color: "#fff",
+                      opacity: on ? 1 : 0.35,
+                    }}
+                  >
+                    {on ? <span data-testid="ticket-label">{label.name}</span> : label.name}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             labelChips
