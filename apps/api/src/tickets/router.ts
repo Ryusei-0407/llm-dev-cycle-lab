@@ -202,6 +202,11 @@ export function createTicketsRouter(hub: RealtimeHub) {
           cursor: input.cursor,
           limit: input.limit,
           requesterEmail: user.role === "agent" ? undefined : user.email,
+          status: input.status,
+          priority: input.priority,
+          label: input.label,
+          unassigned: input.unassigned,
+          unresolved: input.unresolved,
         });
       } catch (err) {
         if (err instanceof BadRequestError) {
@@ -209,6 +214,16 @@ export function createTicketsRouter(hub: RealtimeHub) {
         }
         throw err;
       }
+    }),
+
+    // Inbox badge count (spec: specs/triage.md). Agent-only — a customer is
+    // FORBIDDEN, mirroring agents(). Session required.
+    inboxCount: base.handler(({ context }) => {
+      const user = requireUser(context.user);
+      if (user.role !== "agent") {
+        throw new ORPCError("FORBIDDEN", { message: "agent only" });
+      }
+      return getStore().inboxCount();
     }),
 
     // Ticket detail: the ticket, its thread, and its activity log. Existence →

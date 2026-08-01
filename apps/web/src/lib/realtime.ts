@@ -52,6 +52,10 @@ export function useRealtimeInvalidation(): void {
         // (specs/app-shell.md). Both keys are partial matches over their query.
         void queryClient.invalidateQueries({ queryKey: orpc.tickets.list.key() });
         void queryClient.invalidateQueries({ queryKey: orpc.tickets.listPage.key() });
+        // The sidebar inbox badge (specs/triage.md) tracks the same tickets, so
+        // create/updates re-count it. Only the agent shell issues this query, so
+        // for a customer it is simply a no-op invalidation.
+        void queryClient.invalidateQueries({ queryKey: orpc.tickets.inboxCount.key() });
       }
       void queryClient.invalidateQueries({
         queryKey: orpc.tickets.get.key({ input: { id: event.ticketId } }),

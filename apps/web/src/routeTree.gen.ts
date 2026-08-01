@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BoardRouteImport } from './routes/board'
+import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as TicketsRouteImport } from './routes/tickets'
 import { Route as TicketsIdRouteImport } from './routes/tickets_.$id'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const BoardRoute = BoardRouteImport.update({
   id: '/board',
   path: '/board',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InboxRoute = InboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -44,6 +50,7 @@ const TicketsIdRoute = TicketsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/board': typeof BoardRoute
+  '/inbox': typeof InboxRoute
   '/login': typeof LoginRoute
   '/tickets': typeof TicketsRoute
   '/tickets/$id': typeof TicketsIdRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/board': typeof BoardRoute
+  '/inbox': typeof InboxRoute
   '/login': typeof LoginRoute
   '/tickets': typeof TicketsRoute
   '/tickets/$id': typeof TicketsIdRoute
@@ -59,21 +67,30 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/board': typeof BoardRoute
+  '/inbox': typeof InboxRoute
   '/login': typeof LoginRoute
   '/tickets': typeof TicketsRoute
   '/tickets_/$id': typeof TicketsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/board' | '/login' | '/tickets' | '/tickets/$id'
+  fullPaths: '/' | '/board' | '/inbox' | '/login' | '/tickets' | '/tickets/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/board' | '/login' | '/tickets' | '/tickets/$id'
-  id: '__root__' | '/' | '/board' | '/login' | '/tickets' | '/tickets_/$id'
+  to: '/' | '/board' | '/inbox' | '/login' | '/tickets' | '/tickets/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/board'
+    | '/inbox'
+    | '/login'
+    | '/tickets'
+    | '/tickets_/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BoardRoute: typeof BoardRoute
+  InboxRoute: typeof InboxRoute
   LoginRoute: typeof LoginRoute
   TicketsRoute: typeof TicketsRoute
   TicketsIdRoute: typeof TicketsIdRoute
@@ -93,6 +110,13 @@ declare module '@tanstack/react-router' {
       path: '/board'
       fullPath: '/board'
       preLoaderRoute: typeof BoardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inbox': {
+      id: '/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof InboxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -122,6 +146,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BoardRoute: BoardRoute,
+  InboxRoute: InboxRoute,
   LoginRoute: LoginRoute,
   TicketsRoute: TicketsRoute,
   TicketsIdRoute: TicketsIdRoute,
