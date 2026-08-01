@@ -41,10 +41,18 @@ export const setLabelsInput = z.object({
 
 // listPage: opaque cursor + a 1..100 limit (default 50). The cursor's internal
 // shape (base64url("createdAt|id")) is decoded in the store; a malformed token
-// is a runtime BAD_REQUEST there, not a zod error.
+// is a runtime BAD_REQUEST there, not a zod error. The filter fields are all
+// optional and AND-combined in the store (spec: specs/triage.md); label is a
+// free name (a name absent from the catalogue yields an empty page, not an
+// error). unresolved shares inboxCount's predicate (status <> 'resolved').
 export const listPageInput = z.object({
   cursor: z.string().optional(),
   limit: z.number().int().min(1).max(100).default(50),
+  status: statusSchema.optional(),
+  priority: prioritySchema.optional(),
+  label: z.string().optional(),
+  unassigned: z.boolean().optional(),
+  unresolved: z.boolean().optional(),
 });
 
 export type CreateInput = z.infer<typeof createInput>;

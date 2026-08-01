@@ -146,7 +146,16 @@ export { decodeCursor, encodeCursor } from "./cursor.js";
 import { decodeCursor, encodeCursor } from "./cursor.js";
 
 export type ListPageResult = { items: Ticket[]; nextCursor: string | null };
-export type ListPageArgs = { cursor?: string; limit: number; requesterEmail?: string };
+export type ListPageArgs = {
+  cursor?: string;
+  limit: number;
+  requesterEmail?: string;
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  label?: string;
+  unassigned?: boolean;
+  unresolved?: boolean;
+};
 
 export type AgentRef = { email: string; name: string };
 
@@ -195,12 +204,45 @@ export function createTicketStore(pool: Pool) {
     // (created_at, id) < (cursorCreatedAt, cursorId). No OFFSET. Fetches limit+1
     // to decide nextCursor: if a (limit+1)th row exists there is a next page,
     // otherwise nextCursor is null even when exactly limit rows remain.
-    async listPage({ cursor, limit, requesterEmail }: ListPageArgs): Promise<ListPageResult> {
+    async listPage({
+      cursor,
+      limit,
+      requesterEmail,
+      status,
+      priority,
+      label,
+      unassigned,
+      unresolved,
+    }: ListPageArgs): Promise<ListPageResult> {
       const params: unknown[] = [];
       const where: string[] = [];
       if (requesterEmail) {
         params.push(requesterEmail);
         where.push(`t.requester_email = $${params.length}`);
+      }
+      if (status) {
+        params.push(status);
+        where.push(`t.status = $${params.length}`);
+      }
+      if (priority) {
+        params.push(priority);
+        where.push(`t.priority = $${params.length}`);
+      }
+      if (unassigned) {
+        where.push("t.assignee_email IS NULL");
+      }
+      if (unresolved) {
+        where.push("t.status <> 'resolved'");
+      }
+      // label: an EXISTS over the join to labels by name. A name absent from the
+      // catalogue simply matches no ticket (empty page), which the spec wants
+      // over an error. The name is a bound param, never interpolated.
+      if (label !== undefined) {
+        params.push(label);
+        where.push(
+          `EXISTS (SELECT 1 FROM ticket_labels tl JOIN labels l ON l.id = tl.label_id
+                    WHERE tl.ticket_id = t.id AND l.name = $${params.length})`,
+        );
       }
       if (cursor) {
         const { createdAt, id } = decodeCursor(cursor);
@@ -390,6 +432,16 @@ export function createTicketStore(pool: Pool) {
         `SELECT email, name FROM users WHERE role = 'agent' ORDER BY email ASC`,
       );
       return rows;
+    },
+
+    // Inbox size (spec: specs/triage.md): unassigned tickets that still need
+    // triage — assignee_email IS NULL AND status <> 'resolved'. The router gates
+    // this to agents; the store just counts.
+    async inboxCount(): Promise<number> {
+      const { rows } = await pool.query<{ count: string }>(
+        `SELECT count(*) FROM tickets WHERE assignee_email IS NULL AND status <> 'resolved'`,
+      );
+      return Number(rows[0].count);
     },
   };
 }
