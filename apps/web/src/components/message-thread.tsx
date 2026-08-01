@@ -1,11 +1,12 @@
 import type { Message, TicketEvent } from "@/lib/tickets";
 import { cn } from "@/lib/utils";
 
-// The conversation thread (spec: specs/ticket-detail.md). Rendered as a
-// semantic list so the E2E can assert structure by role (list/listitem) rather
-// than copy. Agent messages lean right, customer left — the Linear-flavoured
-// role differentiation; the author line shows the email (the E2E asserts the
-// posted reply is authored by agent@example.com).
+// The conversation thread (spec: specs/detail-panel.md). Rendered as a semantic
+// list so the E2E can assert structure by role (list/listitem) rather than copy.
+// Every row is a full-width card — role is distinguished by a left border colour,
+// never by width or alignment (spec: 幅・配置では区別しない). The author line
+// shows the email (the E2E asserts the posted reply is authored by
+// agent@example.com).
 //
 // ticket-model merges activity events into the same timeline (spec:
 // specs/ticket-model.md 詳細): messages and events are interleaved by created_at
@@ -14,6 +15,14 @@ import { cn } from "@/lib/utils";
 // Fixed, test-anchored phrasing for each event type. status/assignee render the
 // raw values (open/in_progress/resolved, email); a null assignee is 未割り当て;
 // labels_changed lists the resulting names or なし when cleared.
+// 時刻表示は UTC HH:mm 固定。ローカル TZ に依存させない(VRT の決定性 —
+// spec: detail-panel.md 備考の日付方針をスレッド行にも適用)。
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+}
+
 function eventText(event: TicketEvent): string {
   switch (event.type) {
     case "status_changed": {
@@ -73,20 +82,19 @@ export function MessageThread({
         const message = item.message;
         const isAgent = message.authorRole === "agent";
         return (
-          <li
-            key={item.id}
-            data-testid="message-item"
-            className={cn("flex flex-col gap-1", isAgent ? "items-end" : "items-start")}
-          >
+          <li key={item.id} data-testid="message-item" className="w-full">
             <div
               className={cn(
-                "max-w-[80%] rounded-lg border border-hairline px-4 py-2",
-                isAgent ? "bg-surface-2" : "bg-surface-1",
+                "w-full rounded-lg border border-hairline border-l-2 bg-surface-1 px-4 py-2",
+                isAgent ? "border-l-primary" : "border-l-hairline",
               )}
             >
-              <span data-testid="message-author" className="mb-0.5 block text-xs text-ink-subtle">
-                {message.authorEmail}
-              </span>
+              <div className="mb-0.5 flex items-baseline justify-between gap-2 text-xs text-ink-subtle">
+                <span data-testid="message-author">{message.authorEmail}</span>
+                <time className="tabular-nums text-ink-tertiary" dateTime={message.createdAt}>
+                  {formatTime(message.createdAt)}
+                </time>
+              </div>
               <p className="text-sm whitespace-pre-wrap text-ink">{message.body}</p>
             </div>
           </li>

@@ -1,16 +1,16 @@
 import { ORPCError } from "@orpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { fetchMe } from "@/auth/api";
 import { AppShell } from "@/components/app-shell";
 import { DraftPanel } from "@/components/draft-panel";
 import { MessageThread } from "@/components/message-thread";
-import { StatusBadge } from "@/components/status-badge";
+import { TicketProperties } from "@/components/ticket-properties";
 import { Button } from "@/components/ui/button";
 import { orpc } from "@/lib/orpc";
 import { useSessionUser } from "@/lib/session";
-import type { Label } from "@/lib/tickets";
+import type { TicketStatus } from "@/lib/tickets";
 
 // Auth guard mirrors /tickets: resolve the session in beforeLoad and redirect
 // unauthenticated visitors before any detail UI mounts (specs/auth.md).
@@ -44,9 +44,9 @@ function isForbidden(error: unknown): boolean {
 function TicketDetailPage() {
   const { id } = Route.useParams();
   const queryClient = useQueryClient();
-  // Generate draft is an agent-only tool (specs/customer-portal.md, and the
-  // draft route is 403 for customers per specs/authz.md). Gate on role rather
-  // than relying on the panel happening to be absent.
+  // Generate draft and the property editors are agent-only (specs/customer-portal.md,
+  // and the draft route is 403 for customers per specs/authz.md). Gate on role rather
+  // than relying on controls happening to be absent.
   const isAgent = useSessionUser()?.role === "agent";
 
   const detailQuery = useQuery({
@@ -56,6 +56,29 @@ function TicketDetailPage() {
 
   const invalidateDetail = () =>
     queryClient.invalidateQueries({ queryKey: orpc.tickets.get.queryKey({ input: { id } }) });
+
+  // Property catalogues are agent-only (tickets.agents is an agent API); customers
+  // get a read-only panel, so skip the fetches entirely for them.
+  const agentsQuery = useQuery({
+    ...orpc.tickets.agents.queryOptions(),
+    retry: false,
+    enabled: isAgent,
+  });
+  const labelsQuery = useQuery({
+    ...orpc.tickets.labels.queryOptions(),
+    retry: false,
+    enabled: isAgent,
+  });
+
+  const setStatus = useMutation(
+    orpc.tickets.setStatus.mutationOptions({ onSuccess: invalidateDetail }),
+  );
+  const setAssignee = useMutation(
+    orpc.tickets.setAssignee.mutationOptions({ onSuccess: invalidateDetail }),
+  );
+  const setLabels = useMutation(
+    orpc.tickets.setLabels.mutationOptions({ onSuccess: invalidateDetail }),
+  );
 
   const replyMutation = useMutation(
     orpc.tickets.reply.mutationOptions({ onSuccess: invalidateDetail }),
@@ -112,201 +135,78 @@ function TicketDetailPage() {
   const events = detailQuery.data?.events ?? [];
 
   return (
-    <main className="flex h-full max-w-3xl flex-col gap-4 overflow-auto p-4">
-      {ticket && (
-        <div className="flex items-center gap-3">
-          <span data-testid="ticket-number" className="text-sm text-ink-subtle tabular-nums">
-            SUP-{ticket.number}
-          </span>
-          <h1 data-testid="ticket-subject" className="flex-1 text-xl font-semibold tracking-tight">
-            {ticket.subject}
-          </h1>
-          {/* 付与中ラベルの閲覧はロール不問(編集トグルは agent のみ)。 */}
-          <span data-testid="ticket-labels" className="flex items-center gap-1">
-            {(ticket.labels ?? []).map((label) => (
-              <span
-                key={label.name}
-                data-testid="ticket-label"
-                className="rounded px-1.5 py-0.5 text-xs font-medium text-white"
-                style={{ backgroundColor: label.color }}
-              >
-                {label.name}
-              </span>
-            ))}
-          </span>
-          <StatusBadge status={ticket.status} />
-        </div>
-      )}
+    <div className="flex h-full">
+      {/* スレッド列: 自身がスクロールし、中身は max-w-3xl を左寄せ(mx-auto しない)。 */}
+      <main className="flex-1 min-w-0 overflow-y-auto">
+        <div className="flex max-w-3xl flex-col gap-4 px-6 py-4">
+          {ticket && (
+            <div className="flex flex-col gap-1">
+              <nav data-testid="ticket-breadcrumb" className="flex items-center gap-1 text-sm">
+                <Link to="/tickets" className="text-ink-subtle hover:text-ink">
+                  Tickets
+                </Link>
+                <span className="text-ink-tertiary">›</span>
+                <span data-testid="ticket-number" className="text-ink-subtle tabular-nums">
+                  SUP-{ticket.number}
+                </span>
+              </nav>
+              <h1 data-testid="ticket-subject" className="text-xl font-semibold tracking-tight">
+                {ticket.subject}
+              </h1>
+            </div>
+          )}
 
-      {ticket && isAgent && (
-        <div className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 p-4">
-          <div className="flex items-center gap-3">
-            <StatusControl ticketId={id} status={ticket.status} />
-            <AssigneeControl ticketId={id} assigneeEmail={ticket.assigneeEmail ?? null} />
-          </div>
-          <LabelControl ticketId={id} labels={ticket.labels ?? []} />
-        </div>
-      )}
+          <MessageThread messages={messages} events={events} />
 
-      <MessageThread messages={messages} events={events} />
+          {isAgent && (
+            <DraftPanel
+              ticketId={id}
+              onUseDraft={(text) => {
+                // Use draft overwrites the current reply (spec: 既存入力は上書き) and
+                // clears any stale empty-reply error.
+                setBody(text);
+                setReplyError(null);
+              }}
+            />
+          )}
 
-      {isAgent && (
-        <DraftPanel
-          ticketId={id}
-          onUseDraft={(text) => {
-            // Use draft overwrites the current reply (spec: 既存入力は上書き) and
-            // clears any stale empty-reply error.
-            setBody(text);
-            setReplyError(null);
-          }}
-        />
-      )}
-
-      <form
-        onSubmit={onSubmit}
-        className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 p-4"
-      >
-        <textarea
-          aria-label="Reply"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={3}
-          placeholder="Write a reply…"
-          className="resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        />
-        {replyError && (
-          <p data-testid="reply-error" role="alert" className="text-sm text-destructive">
-            {replyError}
-          </p>
-        )}
-        <div className="flex justify-end">
-          <Button type="submit" disabled={replyMutation.isPending}>
-            Send reply
-          </Button>
-        </div>
-      </form>
-    </main>
-  );
-}
-
-// Agent-only status control on the detail page. Mirrors the list-row select
-// (same testid/options) so a status change can be made where the event thread
-// shows its history; the detail re-fetch pulls the new status_changed event.
-function StatusControl({
-  ticketId,
-  status,
-}: {
-  ticketId: string;
-  status: "open" | "in_progress" | "resolved";
-}) {
-  const queryClient = useQueryClient();
-  const setStatus = useMutation(
-    orpc.tickets.setStatus.mutationOptions({
-      onSuccess: () =>
-        queryClient.invalidateQueries({
-          queryKey: orpc.tickets.get.queryKey({ input: { id: ticketId } }),
-        }),
-    }),
-  );
-  return (
-    <select
-      data-testid="ticket-status-select"
-      aria-label="Status"
-      value={status}
-      onChange={(e) => setStatus.mutate({ id: ticketId, status: e.target.value as typeof status })}
-      className="h-8 w-44 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-    >
-      <option value="open">Open</option>
-      <option value="in_progress">In progress</option>
-      <option value="resolved">Resolved</option>
-    </select>
-  );
-}
-
-// Agent-only assignee control (spec: specs/ticket-model.md 詳細). The options are
-// 未割り当て (value "") plus the agents directory; changing the selection sends
-// setAssignee ("" → null) and re-fetches the detail to reflect the new event +
-// assignee. Only mounted for agents, so tickets.agents (agent-only) is safe.
-function AssigneeControl({
-  ticketId,
-  assigneeEmail,
-}: {
-  ticketId: string;
-  assigneeEmail: string | null;
-}) {
-  const queryClient = useQueryClient();
-  const agentsQuery = useQuery({ ...orpc.tickets.agents.queryOptions(), retry: false });
-  const setAssignee = useMutation(
-    orpc.tickets.setAssignee.mutationOptions({
-      onSuccess: () =>
-        queryClient.invalidateQueries({
-          queryKey: orpc.tickets.get.queryKey({ input: { id: ticketId } }),
-        }),
-    }),
-  );
-  const agents = agentsQuery.data ?? [];
-  return (
-    <select
-      data-testid="assignee-select"
-      aria-label="Assignee"
-      value={assigneeEmail ?? ""}
-      onChange={(e) => setAssignee.mutate({ id: ticketId, assigneeEmail: e.target.value || null })}
-      className="h-8 w-44 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-    >
-      <option value="">未割り当て</option>
-      {agents.map((agent) => (
-        <option key={agent.email} value={agent.email}>
-          {agent.name}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-// Agent-only label editor (spec: specs/ticket-model.md 詳細). Every catalogue
-// label renders as a toggle reflecting current assignment; clicking flips it and
-// sends the full resulting name set via setLabels (server does the全置換).
-function LabelControl({ ticketId, labels }: { ticketId: string; labels: Label[] }) {
-  const queryClient = useQueryClient();
-  const catalogQuery = useQuery({ ...orpc.tickets.labels.queryOptions(), retry: false });
-  const setLabels = useMutation(
-    orpc.tickets.setLabels.mutationOptions({
-      onSuccess: () =>
-        queryClient.invalidateQueries({
-          queryKey: orpc.tickets.get.queryKey({ input: { id: ticketId } }),
-        }),
-    }),
-  );
-  const catalog = catalogQuery.data ?? [];
-  const active = new Set(labels.map((l) => l.name));
-  const toggle = (name: string) => {
-    const next = new Set(active);
-    if (next.has(name)) next.delete(name);
-    else next.add(name);
-    setLabels.mutate({ id: ticketId, labels: [...next] });
-  };
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {catalog.map((label) => {
-        const on = active.has(label.name);
-        return (
-          <button
-            key={label.name}
-            type="button"
-            data-testid={`label-toggle-${label.name}`}
-            aria-pressed={on}
-            onClick={() => toggle(label.name)}
-            className="rounded px-2 py-0.5 text-xs font-medium transition-opacity"
-            style={{
-              backgroundColor: label.color,
-              color: "#fff",
-              opacity: on ? 1 : 0.35,
-            }}
+          <form
+            onSubmit={onSubmit}
+            className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 p-4"
           >
-            {label.name}
-          </button>
-        );
-      })}
+            <textarea
+              aria-label="Reply"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={3}
+              placeholder="Write a reply…"
+              className="resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+            {replyError && (
+              <p data-testid="reply-error" role="alert" className="text-sm text-destructive">
+                {replyError}
+              </p>
+            )}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={replyMutation.isPending}>
+                Send reply
+              </Button>
+            </div>
+          </form>
+        </div>
+      </main>
+
+      {ticket && (
+        <TicketProperties
+          ticket={ticket}
+          role={isAgent ? "agent" : "customer"}
+          agents={agentsQuery.data ?? []}
+          labelCatalog={labelsQuery.data ?? []}
+          onStatusChange={(status: TicketStatus) => setStatus.mutate({ id, status })}
+          onAssigneeChange={(assigneeEmail) => setAssignee.mutate({ id, assigneeEmail })}
+          onLabelsChange={(labels) => setLabels.mutate({ id, labels })}
+        />
+      )}
     </div>
   );
 }
