@@ -115,6 +115,10 @@ test.describe("visual regression @feature-visual @visual", () => {
     await page.route("**/api/rpc/tickets/agents", (route) =>
       route.fulfill({ json: { json: [{ email: "aki@example.com", name: "Aki Agent" }] } }),
     );
+    // サイドバーの受信トレイバッジ。実DBの件数に依存させない(固定値 2)。
+    await page.route("**/api/rpc/tickets/inboxCount", (route) =>
+      route.fulfill({ json: { json: 2 } }),
+    );
   }
 
   // 成功時の成果物: 比較に使ったのと同条件で撮った現画面を添付する。
@@ -188,6 +192,32 @@ test.describe("visual regression @feature-visual @visual", () => {
         await expect(page.getByTestId("ticket-subject")).toContainText("Cannot sign in from SSO");
         await expect(page).toHaveScreenshot("ticket-detail.png", { fullPage: true });
         await attachShot(page, "ticket-detail");
+      });
+    },
+  );
+
+  test(
+    "inbox (empty)",
+    {
+      annotation: {
+        type: "description",
+        description: "受信トレイの空状態(inbox-empty 表示 + 0件でバッジ非表示)を baseline と比較",
+      },
+    },
+    async ({ page }) => {
+      await stubTicketData(page);
+      // 後から登録した route が優先される — 空の受信トレイと 0 件バッジに上書き。
+      await page.route("**/api/rpc/tickets/listPage", (route) =>
+        route.fulfill({ json: { json: { items: [], nextCursor: null } } }),
+      );
+      await page.route("**/api/rpc/tickets/inboxCount", (route) =>
+        route.fulfill({ json: { json: 0 } }),
+      );
+      await test.step("空の受信トレイを開いて撮影する", async () => {
+        await page.goto("/inbox");
+        await expect(page.getByTestId("inbox-empty")).toBeVisible();
+        await expect(page).toHaveScreenshot("inbox-empty.png", { fullPage: true });
+        await attachShot(page, "inbox-empty");
       });
     },
   );

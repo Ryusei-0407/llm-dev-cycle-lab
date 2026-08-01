@@ -19,7 +19,7 @@ import { Pool } from "pg";
 // boundary in authz.test.ts). Filters live in the store because the spec pins
 // them as unit観点 ("store.listPage フィルタ").
 import { createPool } from "../src/db.js";
-import { createTicketStore } from "../src/tickets/store.js";
+import { createTicketStore, type ListPageArgs } from "../src/tickets/store.js";
 // applySchemaAndSeed drops + recreates the schema and re-inserts the fixed
 // seeds — the idempotent reset the store lane leans on for per-test isolation.
 import { applySchemaAndSeed } from "../../../scripts/test-db.mjs";
@@ -211,7 +211,7 @@ describe("triage store: listPage フィルタ @feature-triage", () => {
       const collected: string[] = [];
       let cursor: string | null = null;
       for (let guard = 0; guard <= all.length + 1; guard++) {
-        const input: Record<string, unknown> = { limit: 1, unresolved: true };
+        const input: ListPageArgs = { limit: 1, unresolved: true };
         if (cursor) input.cursor = cursor;
         const page = (await store.listPage(input)) as {
           items: PageItem[];
@@ -238,13 +238,22 @@ describe("triage store: listPage フィルタ @feature-triage", () => {
       },
     },
     async () => {
+      // スコープ検証を空虚にしない: 全シードが customer 所有のため、agent 所有の
+      // high チケットを1件作り「スコープで除外されること」を実際に観測する。
+      const agentOwned = "Agent-owned high (scope check)";
+      await store.create({
+        subject: agentOwned,
+        priority: "high",
+        requesterEmail: "agent@example.com",
+      });
       const page = (await store.listPage({
         limit: 100,
         priority: "high",
-        scope: { requesterEmail: CUSTOMER_EMAIL },
+        requesterEmail: CUSTOMER_EMAIL,
       })) as { items: Array<{ subject: string; requesterEmail: string }> };
       const subjects = page.items.map((t) => t.subject);
       expect(subjects).toContain(LOGIN);
+      expect(subjects).not.toContain(agentOwned);
       // priority フィルタが scope と AND で効いていること: high 以外の自分所有行
       // (Billing=medium / Feature=low)は除外される。これが無いとフィルタ未実装でも
       // 「全て customer 所有」だけで通ってしまう。
