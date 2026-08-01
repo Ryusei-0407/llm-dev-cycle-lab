@@ -47,7 +47,11 @@ export function useRealtimeInvalidation(): void {
       // is a partial match, so the detail key matches regardless of query input
       // options.
       if (event.type === "ticket.created" || event.type === "ticket.updated") {
+        // Two list surfaces re-fetch: the board still reads tickets.list, while
+        // the /tickets list moved to the tickets.listPage infinite query
+        // (specs/app-shell.md). Both keys are partial matches over their query.
         void queryClient.invalidateQueries({ queryKey: orpc.tickets.list.key() });
+        void queryClient.invalidateQueries({ queryKey: orpc.tickets.listPage.key() });
       }
       void queryClient.invalidateQueries({
         queryKey: orpc.tickets.get.key({ input: { id: event.ticketId } }),

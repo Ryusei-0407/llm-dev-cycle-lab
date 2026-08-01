@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, redirect, useLoaderData } from "@tanstack/react-router";
 import { fetchMe } from "@/auth/api";
-import { TopNav } from "@/auth/TopNav";
+import { AppShell } from "@/components/app-shell";
 import { KanbanBoard } from "@/components/kanban-board";
 import { orpc } from "@/lib/orpc";
 import { useSessionUser } from "@/lib/session";
@@ -22,10 +22,9 @@ export const Route = createFileRoute("/board")({
 function BoardRoute() {
   const { user } = useLoaderData({ from: "/board" });
   return (
-    <div className="flex min-h-dvh flex-col">
-      <TopNav user={user} />
+    <AppShell user={user}>
       <BoardPage />
-    </div>
+    </AppShell>
   );
 }
 
@@ -49,7 +48,7 @@ function BoardPage() {
 
   if (!isAgent) {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-5xl flex-col gap-4 p-4">
+      <main className="flex h-full flex-col gap-4 overflow-auto p-4">
         <p
           data-testid="board-forbidden"
           role="alert"
@@ -68,7 +67,7 @@ function BoardPage() {
   };
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-4 p-4">
+    <main className="flex h-full w-full flex-col gap-4 overflow-auto p-4">
       <h1 className="text-xl font-semibold tracking-tight">Board</h1>
       {ticketsQuery.isError ? (
         <p data-testid="board-error" role="alert" className="text-sm text-destructive">

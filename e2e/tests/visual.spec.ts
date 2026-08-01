@@ -101,6 +101,10 @@ test.describe("visual regression @feature-visual @visual", () => {
     await page.route("**/api/rpc/tickets/list", (route) =>
       route.fulfill({ json: { json: TICKETS } }),
     );
+    // 一覧ページは listPage(カーソルページネーション)を使う。1ページで完結。
+    await page.route("**/api/rpc/tickets/listPage", (route) =>
+      route.fulfill({ json: { json: { items: TICKETS, nextCursor: null } } }),
+    );
     await page.route("**/api/rpc/tickets/get", (route) =>
       route.fulfill({ json: { json: DETAIL } }),
     );

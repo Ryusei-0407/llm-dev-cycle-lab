@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, useLoaderData } from "@tanstack/react-router";
 import { App } from "@/App";
 import { fetchMe } from "@/auth/api";
-import { TopNav } from "@/auth/TopNav";
+import { AppShell } from "@/components/app-shell";
 
 // Auth guard: resolve the session before the protected home renders. Loading in
 // beforeLoad (not the component) means an unauthenticated visitor is redirected
@@ -19,9 +19,8 @@ export const Route = createFileRoute("/")({
 function Home() {
   const { user } = useLoaderData({ from: "/" });
   return (
-    <div className="flex min-h-dvh flex-col">
-      <TopNav user={user} />
+    <AppShell user={user}>
       <App />
-    </div>
+    </AppShell>
   );
 }
