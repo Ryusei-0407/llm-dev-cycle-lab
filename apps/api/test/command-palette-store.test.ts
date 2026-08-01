@@ -124,6 +124,23 @@ describe("command-palette store.search @feature-command-palette", () => {
       // 「SUP- を剥がして subject 部分一致」でも通ってしまう。
       expect(rows.map((r) => r.number)).not.toContain((near as { number: number }).number);
       expect(rows.every((r) => r.number === num)).toBe(true);
+
+      // 敵対的レビューの指摘の固定: 「完全一致 → 数字の部分一致」への改竄は、
+      // num を部分文字列に含む superstring 番号(例: 4 に対する 14)が無いと
+      // 生き残る。superstring が採番されるまで作成し、混入しないことを見る。
+      const created: number[] = [];
+      for (let i = 0; created.length < 12 && i < 12; i++) {
+        const t = await store.create({
+          subject: `Palette superstring filler ${i}`,
+          priority: "low",
+          requesterEmail: CUSTOMER_EMAIL,
+        });
+        created.push((t as { number: number }).number);
+      }
+      const superstring = created.find((n) => n !== num && String(n).includes(String(num)));
+      expect(superstring).toBeDefined();
+      const exact = (await store.search({ q: String(num) })) as Array<{ number: number }>;
+      expect(exact.map((r) => r.number)).toEqual([num]);
     },
   );
 
