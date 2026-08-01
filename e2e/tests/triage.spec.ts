@@ -81,8 +81,11 @@ test.describe("triage @feature-triage", () => {
 
       // Structural assertion: 最終状態の app-sidebar が受信トレイリンクを含む骨格
       // (role と順序のみ)。aria snapshot は不在でも通りうるため上で toBeVisible 済み。
+      // 受信トレイのアクセシブルネームはバッジ件数を含み得る(共有DBで並走
+      // テストが未割り当てチケットを残すと「受信トレイ N」になる)。件数に
+      // 依存しないよう正規表現で前方一致させる。
       await expect(page.getByTestId("app-sidebar")).toMatchAriaSnapshot(`
-        - link "受信トレイ"
+        - link /受信トレイ/
         - link "Tickets"
         - link "Board"
         - button "Sign out"
