@@ -103,8 +103,9 @@ test.describe("kanban board @feature-kanban", () => {
 
       await test.step("新しいステータスが永続していることを確認する", async () => {
         await page.goto(`/tickets/${ticketId}`);
-        // 詳細画面の status バッジが in_progress を示す(永続の確認)。
-        await expect(page.getByTestId("status-badge")).toContainText(/in progress/i);
+        // agent の詳細はヘッダの status バッジではなくプロパティパネルの
+        // セレクトが状態を持つ(specs/detail-panel.md)。選択値で永続を確認。
+        await expect(page.getByTestId("ticket-status-select")).toHaveValue("in_progress");
         await snap(page, testInfo, "永続確認");
       });
 
