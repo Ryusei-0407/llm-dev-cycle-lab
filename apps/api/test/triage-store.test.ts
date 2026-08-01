@@ -199,6 +199,18 @@ describe("triage store: listPage フィルタ @feature-triage", () => {
       },
     },
     async () => {
+      // 敵対的レビューの指摘の固定: シードの resolved 行は created_at 最新のため
+      // 常にカーソル手前で除外され「フィルタがページ境界を跨いで効く」を実質
+      // 検証できていなかった。unresolved 2行の**間の日付**に resolved 行を挿入し、
+      // カーソル送りの途中でフィルタ除外が起きる並びを作る。
+      const midResolved = "Mid-date resolved (boundary pin)";
+      await pool.query(
+        `INSERT INTO tickets (id, subject, status, priority, requester_email, created_at)
+         VALUES ('00000000-0000-7000-8000-0000000000f1', $1, 'resolved', 'low',
+                 'customer@example.com', '2026-01-01T12:00:00.000Z')`,
+        [midResolved],
+      );
+
       const all = await subjectsOf({ unresolved: true });
       // フィルタが実際に効いていること(resolved を除外)をアンカーする。ここが
       // 無いと、フィルタ未実装で全件返っても「一括取得列とページング列が一致」で
@@ -206,6 +218,7 @@ describe("triage store: listPage フィルタ @feature-triage", () => {
       expect(all).toContain(LOGIN);
       expect(all).toContain(BILLING);
       expect(all).not.toContain(FEATURE);
+      expect(all).not.toContain(midResolved);
       expect(all.length).toBeGreaterThanOrEqual(2);
 
       const collected: string[] = [];
@@ -222,8 +235,10 @@ describe("triage store: listPage フィルタ @feature-triage", () => {
         if (cursor === null) break;
       }
       expect(cursor).toBe(null);
-      // ページング列も resolved を含まない(フィルタがページ境界を跨いで効く)。
+      // ページング列も resolved を含まない(フィルタがページ境界を跨いで効く —
+      // 中間日付の resolved 行はカーソル送りの途中で除外される)。
       expect(collected).not.toContain(FEATURE);
+      expect(collected).not.toContain(midResolved);
       expect(collected).toEqual(all);
     },
   );

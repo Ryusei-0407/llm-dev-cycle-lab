@@ -186,4 +186,35 @@ describe("triage: listPage フィルタが HTTP面で機能する @feature-triag
       expect(subjects).not.toContain("Feature request: dark mode");
     },
   );
+
+  it(
+    "customer の listPage は自分所有のみ(agent 所有チケットが混入しない)",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "敵対的レビューの反例の固定: router が customer スコープを listPage に渡し忘れる改竄が全テストを通過していた(クロスオーナー漏洩)。agent 所有チケットを作った上で customer の listPage に混入しないことを HTTP 面で検証",
+      },
+    },
+    async () => {
+      const app = createApp();
+      const agentCookie = await cookieFor(app, SEED.agent);
+      const secret = "Agent-owned secret (scope pin)";
+      const created = await rpc(app, "create", { subject: secret, priority: "low" }, agentCookie);
+      expect(created.status).toBe(200);
+
+      const customerCookie = await cookieFor(app, SEED.customer);
+      const res = await rpc(app, "listPage", { limit: 100 }, customerCookie);
+      expect(res.status).toBe(200);
+      const page = unwrap(await res.json()) as {
+        items: Array<{ subject: string; requesterEmail: string }>;
+      };
+      const subjects = page.items.map((t) => t.subject);
+      expect(subjects).toContain("Cannot login to dashboard");
+      expect(subjects).not.toContain(secret);
+      for (const t of page.items) {
+        expect(t.requesterEmail).toBe(SEED.customer.email);
+      }
+    },
+  );
 });
