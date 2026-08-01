@@ -135,10 +135,29 @@ const LIST_SQL = `SELECT ${COLUMNS} FROM tickets t ${ORDER}`;
 const LIST_BY_REQUESTER_SQL = `SELECT ${COLUMNS} FROM tickets t WHERE t.requester_email = $1 ${ORDER}`;
 const GET_BY_ID_SQL = `SELECT ${COLUMNS} FROM tickets t WHERE t.id = $1`;
 
+// command-palette search (spec: specs/command-palette.md). A query that is a bare
+// number, optionally SUP- prefixed (SUP-12 / 12), is an exact number match;
+// anything else is a case-insensitive subject substring match. Capped at 20 rows
+// under the list ordering.
+const SEARCH_LIMIT = 20;
+const NUMBER_QUERY = /^(?:SUP-)?(\d+)$/i;
+
+// Escape the ILIKE meta-characters so a subject query is treated literally: % _
+// (and the escape char itself) match themselves rather than acting as wildcards.
+// The pattern is bound as a param and wrapped in %…% for a substring match.
+function escapeLike(q: string): string {
+  return q.replace(/[\\%_]/g, "\\$&");
+}
+
 // Optional filter for role-scoped listing (specs/authz.md): a customer sees only
 // their own tickets. The router owns the authorization decision; the store just
 // applies the requesterEmail filter when asked. Existing no-arg calls are unchanged.
 export type ListFilter = { requesterEmail?: string };
+
+// search takes the raw query plus the same optional role scope as list (spec:
+// specs/command-palette.md). One object arg mirrors listPage's shape so the
+// router threads scope the same way it does for the list.
+export type SearchArgs = { q: string; requesterEmail?: string };
 
 // The opaque keyset cursor lives in cursor.ts; re-exported so existing importers
 // (and listPage below) can keep reaching it through the store module.
@@ -183,6 +202,35 @@ export function createTicketStore(pool: Pool) {
       const { rows } = filter?.requesterEmail
         ? await pool.query<Row>(LIST_BY_REQUESTER_SQL, [filter.requesterEmail])
         : await pool.query<Row>(LIST_SQL);
+      return rows.map(toTicket);
+    },
+
+    // Role-scoped search (spec: specs/command-palette.md). A number-shaped query
+    // (SUP-12 / 12) matches t.number exactly; anything else is a case-insensitive
+    // subject substring (ILIKE with meta-characters escaped to literals). The
+    // optional requesterEmail scope mirrors list(): the router passes the
+    // customer's own email so a customer never sees another owner's tickets.
+    // Capped at SEARCH_LIMIT rows, list ordering (created_at DESC, id DESC).
+    async search({ q, requesterEmail }: SearchArgs): Promise<Ticket[]> {
+      const match = NUMBER_QUERY.exec(q);
+      const params: unknown[] = [];
+      const where: string[] = [];
+      if (match) {
+        params.push(Number(match[1]));
+        where.push(`t.number = $${params.length}`);
+      } else {
+        params.push(`%${escapeLike(q)}%`);
+        where.push(`t.subject ILIKE $${params.length} ESCAPE '\\'`);
+      }
+      if (requesterEmail) {
+        params.push(requesterEmail);
+        where.push(`t.requester_email = $${params.length}`);
+      }
+      params.push(SEARCH_LIMIT);
+      const { rows } = await pool.query<Row>(
+        `SELECT ${COLUMNS} FROM tickets t WHERE ${where.join(" AND ")} ${ORDER} LIMIT $${params.length}`,
+        params,
+      );
       return rows.map(toTicket);
     },
 
