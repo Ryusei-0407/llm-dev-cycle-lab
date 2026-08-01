@@ -223,6 +223,27 @@ test.describe("visual regression @feature-visual @visual", () => {
   );
 
   test(
+    "command palette (open)",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "コマンドパレットを開いた状態(ナビ項目 + 検索入力)を baseline と比較。開閉はサイドバーの検索ボタン経由(クリック経路の担保を兼ねる)",
+      },
+    },
+    async ({ page }) => {
+      await stubTicketData(page);
+      await test.step("サイドバーの検索ボタンでパレットを開いて撮影する", async () => {
+        await page.goto("/tickets");
+        await page.getByTestId("sidebar-search").click();
+        await expect(page.getByTestId("command-palette")).toBeVisible();
+        await expect(page).toHaveScreenshot("palette.png", { fullPage: true });
+        await attachShot(page, "palette");
+      });
+    },
+  );
+
+  test(
     "kanban board",
     {
       annotation: {

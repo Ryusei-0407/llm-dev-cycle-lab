@@ -19,6 +19,15 @@ import { snap } from "../helpers/snap";
 // - customer(入れ子 describe でセッション切替): nav-board / nav-inbox 不在・
 //   nav-tickets 在。agent 所有チケットの件名で検索してもヒットしない(スコープ)・
 //   自分のシード件名ではヒットする。
+// ショートカットリスナは AppShell の effect で登録されるため、描画直後の押下は
+// 取りこぼされ得る(押下1回きりだとレースで flaky)。開くまで押下を繰り返す。
+async function openPalette(page: import("@playwright/test").Page) {
+  await expect(async () => {
+    await page.keyboard.press("Control+k");
+    await expect(page.getByTestId("command-palette")).toBeVisible({ timeout: 500 });
+  }).toPass();
+}
+
 test.describe("command-palette @feature-command-palette", () => {
   test(
     "agent opens the palette, searches a ticket, and navigates @smoke",
@@ -32,7 +41,7 @@ test.describe("command-palette @feature-command-palette", () => {
     async ({ page }, testInfo) => {
       await test.step("チケット一覧で Ctrl+K を押しパレットを開く", async () => {
         await page.goto("/tickets");
-        await page.keyboard.press("Control+k");
+        await openPalette(page);
         await expect(page.getByTestId("command-palette")).toBeVisible();
         // 開いたら自動フォーカス。focus は aria snapshot に出ないので明示的に見る。
         await expect(page.getByTestId("palette-input")).toBeFocused();
@@ -59,7 +68,7 @@ test.describe("command-palette @feature-command-palette", () => {
       });
 
       await test.step("再度 Ctrl+K → Board へナビゲートする", async () => {
-        await page.keyboard.press("Control+k");
+        await openPalette(page);
         await expect(page.getByTestId("command-palette")).toBeVisible();
         await page.getByTestId("palette-nav-board").click();
         await expect(page).toHaveURL(/\/board$/);
@@ -72,7 +81,7 @@ test.describe("command-palette @feature-command-palette", () => {
       // role と順序のみ)。空検索でもナビは出るので、開いた直後の骨格を固定する。
       // aria snapshot は不在でも通りうるため上で toBeVisible / toBeFocused 済み。
       await test.step("パレットの構造(role と順序)を固定する", async () => {
-        await page.keyboard.press("Control+k");
+        await openPalette(page);
         await expect(page.getByTestId("command-palette")).toBeVisible();
         await expect(page.getByTestId("command-palette")).toMatchAriaSnapshot(`
           - dialog:
@@ -98,7 +107,7 @@ test.describe("command-palette @feature-command-palette", () => {
     async ({ page }, testInfo) => {
       await test.step("パレットを開き番号 SUP-1 で検索する", async () => {
         await page.goto("/tickets");
-        await page.keyboard.press("Control+k");
+        await openPalette(page);
         await expect(page.getByTestId("command-palette")).toBeVisible();
         await page.getByTestId("palette-input").fill("SUP-1");
         // seed の SUP-1 は Cannot login to dashboard。subject で一意に絞る。
@@ -159,7 +168,7 @@ test.describe("command-palette @feature-command-palette", () => {
 
         await test.step("顧客でパレットを開きナビの出し分けを確認する", async () => {
           await page.goto("/tickets");
-          await page.keyboard.press("Control+k");
+          await openPalette(page);
           await expect(page.getByTestId("command-palette")).toBeVisible();
           // agent 専用ナビは不在、共通の Tickets は在る。
           await expect(page.getByTestId("palette-nav-tickets")).toBeVisible();

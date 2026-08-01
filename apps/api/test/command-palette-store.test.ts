@@ -10,7 +10,7 @@ import { Pool } from "pg";
 // The search method does not exist yet in this branch (RED). db.ts holds the
 // connection helper, store.ts exposes createTicketStore(pool)。
 import { createPool } from "../src/db.js";
-import { createTicketStore } from "../src/tickets/store.js";
+import { createTicketStore, type SearchArgs } from "../src/tickets/store.js";
 // applySchemaAndSeed drops + recreates the schema and re-inserts the fixed
 // seeds — the idempotent reset the store lane leans on for per-test isolation.
 import { applySchemaAndSeed } from "../../../scripts/test-db.mjs";
@@ -53,7 +53,7 @@ describe("command-palette store.search @feature-command-palette", () => {
     await applySchemaAndSeed(databaseUrl());
   });
 
-  async function subjectsOf(input: Record<string, unknown>): Promise<string[]> {
+  async function subjectsOf(input: SearchArgs): Promise<string[]> {
     const rows = (await store.search(input)) as Array<{ subject: string }>;
     return rows.map((t) => t.subject);
   }
