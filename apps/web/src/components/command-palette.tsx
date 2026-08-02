@@ -50,7 +50,13 @@ export function CommandPalette({ open, onOpenChange, isAgent }: CommandPalettePr
     void navigate({ to });
   };
 
-  const navItems = NAV_ITEMS.filter((item) => !item.agentOnly || isAgent);
+  // shouldFilter=false のため cmdk はナビを絞り込まない。自前で検索語に
+  // マッチしないナビを外す — さもないと cmdk の先頭選択が常にナビに残り、
+  // 検索ヒットへ Enter で確定できない(「検索が効かない」体験になる)。
+  const q = query.trim().toLowerCase();
+  const navItems = NAV_ITEMS.filter(
+    (item) => (!item.agentOnly || isAgent) && (q === "" || item.label.toLowerCase().includes(q)),
+  );
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -74,18 +80,20 @@ export function CommandPalette({ open, onOpenChange, isAgent }: CommandPalettePr
               autoFocus
             />
             <CommandList>
-              <CommandGroup heading="ナビゲーション">
-                {navItems.map((item) => (
-                  <CommandItem
-                    key={item.testid}
-                    data-testid={item.testid}
-                    value={item.testid}
-                    onSelect={() => go(item.to)}
-                  >
-                    {item.label}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+              {navItems.length > 0 && (
+                <CommandGroup heading="ナビゲーション">
+                  {navItems.map((item) => (
+                    <CommandItem
+                      key={item.testid}
+                      data-testid={item.testid}
+                      value={item.testid}
+                      onSelect={() => go(item.to)}
+                    >
+                      {item.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
               {query.length > 0 && (
                 <CommandGroup heading="チケット">
                   {/* cmdk's Command.Empty only renders when the whole list has no
