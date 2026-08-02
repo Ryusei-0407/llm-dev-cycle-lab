@@ -134,5 +134,6 @@
     "apps/web/src/components/insight-charts.tsx",
     "apps/web/src/components/app-shell.tsx",
     "e2e/tests/insights.spec.ts"
-  ]
+  ],
+  "evals": ["apps/api/evals/**"]
 }
