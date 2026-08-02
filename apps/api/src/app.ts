@@ -11,6 +11,7 @@ import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
 import { createRealtimeHub, type RealtimeHub } from "./realtime.js";
 import { serverTiming } from "./server-timing.js";
+import { createCopilotRouter } from "./tickets/copilot.js";
 import { createDraftRouter } from "./tickets/draft.js";
 import {
   createTicketsRouter,
@@ -130,6 +131,18 @@ export function createApp(options: CreateAppOptions = {}): App {
     "/api/tickets",
     createDraftRouter({ resolveUser, ticketStore: getStore, messageStore: getMessageStore }),
   );
+
+  // copilot (spec: specs/copilot.md): POST /api/copilot/chat streams a
+  // status answer as SSE, grounded on the SQL snapshot. Same DB guard as
+  // /api/tickets/* — a missing DATABASE_URL is 500 db_misconfigured before any
+  // store query, never a silent failure.
+  app.use("/api/copilot/*", async (c, next) => {
+    if (!isDbConfigured()) {
+      return c.json({ error: "db_misconfigured" }, 500);
+    }
+    await next();
+  });
+  app.route("/api/copilot", createCopilotRouter({ resolveUser, ticketStore: getStore }));
 
   app.post("/api/chat", async (c) => {
     let body: unknown;

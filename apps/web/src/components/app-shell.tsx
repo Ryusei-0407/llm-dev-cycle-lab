@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { User } from "@/auth/api";
 import { logout, registerPasskey } from "@/auth/api";
 import { CommandPalette } from "@/components/command-palette";
+import { CopilotPanel } from "@/components/copilot-panel";
 import { Button } from "@/components/ui/button";
 import { orpc } from "@/lib/orpc";
 import { useRealtimeInvalidation } from "@/lib/realtime";
@@ -42,6 +43,23 @@ export function AppShell({ user, children }: { user: User; children: React.React
   // ticket.created/updated invalidate this key alongside the lists
   // (lib/realtime.ts), so the badge tracks the inbox without a manual refetch.
   const isAgent = user.role === "agent";
+
+  // copilot (spec: specs/copilot.md): a docked chat, agent-only. The open state
+  // and the Ctrl/⌘+/ toggle live here so a single panel is mounted per shell and
+  // stays open across route changes. Both the button and the shortcut are gated
+  // on isAgent — a customer never sees the launcher and the key is inert.
+  const [copilotOpen, setCopilotOpen] = useState(false);
+  useEffect(() => {
+    if (!isAgent) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+        e.preventDefault();
+        setCopilotOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isAgent]);
   const inboxCountQuery = useQuery({
     ...orpc.tickets.inboxCount.queryOptions(),
     enabled: isAgent,
@@ -116,6 +134,19 @@ export function AppShell({ user, children }: { user: User; children: React.React
           </Link>
         )}
         <div className="mt-auto flex flex-col gap-2 px-2">
+          {/* copilot launcher (spec: specs/copilot.md), agent-only — directly
+              above current-user. Ctrl/⌘+/ toggles the same panel. */}
+          {isAgent && (
+            <button
+              type="button"
+              data-testid="copilot-launch"
+              onClick={() => setCopilotOpen(true)}
+              className="flex items-center justify-between rounded-md border border-border px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Copilot に質問…
+              <kbd className="rounded bg-surface-2 px-1.5 text-xs text-foreground">⌘/</kbd>
+            </button>
+          )}
           <span data-testid="current-user" className="text-sm text-muted-foreground">
             {user.name}
           </span>
@@ -146,6 +177,7 @@ export function AppShell({ user, children }: { user: User; children: React.React
       </nav>
       <div className="flex-1 min-w-0 overflow-hidden">{children}</div>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isAgent={isAgent} />
+      {isAgent && copilotOpen && <CopilotPanel onClose={() => setCopilotOpen(false)} />}
     </div>
   );
 }
