@@ -138,5 +138,6 @@
     "apps/web/src/components/ticket-properties.tsx",
     "apps/web/src/components/message-thread.tsx",
     "e2e/tests/set-priority.spec.ts"
-  ]
+  ],
+  "evals": ["apps/api/evals/**"]
 }

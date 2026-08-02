@@ -1,0 +1,20 @@
+{
+  "id": "copilot-unassigned",
+  "ticket": {
+    "subject": "未割り当てのチケットはある?",
+    "status": "open",
+    "priority": "medium",
+    "requesterEmail": "agent@example.com"
+  },
+  "messages": [
+    {
+      "authorRole": "agent",
+      "authorEmail": "agent@example.com",
+      "body": "未割り当てのチケットはある? 以下の固定スナップショットの数値だけを根拠に、日本語で簡潔に答えてください。チケットを参照するときは必ず SUP-{番号} 形式で書いてください。スナップショット: {\"byStatus\":{\"open\":4,\"in_progress\":1,\"resolved\":4},\"byPriority\":{\"low\":1,\"medium\":3,\"high\":3},\"unassigned\":4,\"resolvedLast7d\":4,\"stale\":[{\"number\":7,\"subject\":\"Export to CSV times out\",\"status\":\"open\"},{\"number\":9,\"subject\":\"Webhook retries duplicated\",\"status\":\"in_progress\"}]}"
+    }
+  ],
+  "mustMention": ["SUP-"],
+  "mustNotMention": ["You are a support agent"],
+  "minChars": 20,
+  "maxChars": 1600
+}

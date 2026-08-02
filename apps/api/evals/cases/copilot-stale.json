@@ -1,0 +1,20 @@
+{
+  "id": "copilot-stale",
+  "ticket": {
+    "subject": "停滞しているチケットは?",
+    "status": "open",
+    "priority": "medium",
+    "requesterEmail": "agent@example.com"
+  },
+  "messages": [
+    {
+      "authorRole": "agent",
+      "authorEmail": "agent@example.com",
+      "body": "停滞しているチケットは? とくに SUP-12 は動きがない気がします。以下の固定スナップショットの数値だけを根拠に、日本語で簡潔に答えてください。チケットを参照するときは必ず SUP-{番号} 形式で書いてください。スナップショット: {\"byStatus\":{\"open\":3,\"in_progress\":2,\"resolved\":6},\"byPriority\":{\"low\":2,\"medium\":5,\"high\":2},\"unassigned\":2,\"resolvedLast7d\":6,\"stale\":[{\"number\":12,\"subject\":\"Printer smells like toast\",\"status\":\"open\"},{\"number\":15,\"subject\":\"SSO metadata refresh stuck\",\"status\":\"in_progress\"}]}"
+    }
+  ],
+  "mustMention": ["SUP-12"],
+  "mustNotMention": ["You are a support agent"],
+  "minChars": 20,
+  "maxChars": 1600
+}
