@@ -16,6 +16,13 @@ import { orpc } from "@/lib/orpc";
 // appends deltas into these parts as the stream arrives).
 type ChatMessage = ReturnType<typeof useChat>["messages"][number];
 
+// 会話が空のときに出す定型質問チップ(spec: 文言完全一致でテスト可能に固定)。
+const SUGGESTIONS = [
+  "全体のチケットの進行状況は?",
+  "未割り当てのチケットはある?",
+  "停滞しているチケットは?",
+];
+
 function messageText(message: ChatMessage): string {
   return message.parts
     .filter((p): p is { type: "text"; content: string } => p.type === "text")
@@ -32,16 +39,22 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  // 会話クリア(spec): connection を作り直すと useChat が新しい ChatClient を張り
+  // 直し、messages が空に戻る。resetKey を進めて useMemo を再評価させる。下書き
+  // (draft)や開閉状態はこの state に紐づかないので影響しない。
+  const [resetKey, setResetKey] = useState(0);
+
   // The server derives everything from the SQL snapshot + the wire messages, so
   // no request body data is needed beyond the conversation useChat sends.
   // credentials "include" carries the session cookie (the route is auth-gated).
   const connection = useMemo(
     () => fetchServerSentEvents("/api/copilot/chat", { credentials: "include" }),
-    [],
+    [resetKey],
   );
-  const { messages, sendMessage, error } = useChat({ connection });
+  const { messages, sendMessage, isLoading, error } = useChat({ connection });
 
   const [draft, setDraft] = useState("");
+  const isEmpty = messages.length === 0;
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -69,6 +82,17 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
     >
       <div className="flex items-center gap-2 border-b border-hairline px-4 py-3">
         <h2 className="flex-1 text-sm font-semibold text-ink">Copilot</h2>
+        {!isEmpty && (
+          <button
+            type="button"
+            data-testid="copilot-clear"
+            onClick={() => setResetKey((k) => k + 1)}
+            disabled={isLoading}
+            className="text-sm text-ink-subtle transition-colors hover:text-ink disabled:opacity-50"
+          >
+            クリア
+          </button>
+        )}
         <button
           type="button"
           data-testid="copilot-close"
@@ -80,6 +104,24 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-3">
+        {isEmpty && (
+          <div className="flex flex-col gap-2">
+            <p data-testid="copilot-suggest-heading" className="text-xs text-ink-subtle">
+              よくある質問
+            </p>
+            {SUGGESTIONS.map((text) => (
+              <button
+                key={text}
+                type="button"
+                data-testid="copilot-suggestion"
+                onClick={() => void sendMessage(text)}
+                className="self-start rounded-lg border border-hairline px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-1"
+              >
+                {text}
+              </button>
+            ))}
+          </div>
+        )}
         {messages.map((message) =>
           message.role === "user" ? (
             <p
