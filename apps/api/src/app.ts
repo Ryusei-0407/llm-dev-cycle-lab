@@ -39,7 +39,15 @@ function getProvider(): LLMProvider {
 // tickets router broadcasts ticket changes through it, and unit tests inject a
 // recording hub to observe those broadcasts without opening a socket. Default —
 // a fresh in-memory hub — leaves existing callers (index.ts) unaffected.
-export type CreateAppOptions = { hub?: RealtimeHub; passkeyVerifier?: PasskeyVerifier };
+export type CreateAppOptions = {
+  hub?: RealtimeHub;
+  passkeyVerifier?: PasskeyVerifier;
+  // copilot (spec: specs/copilot.md): an injectable LLMProvider, the same idiom
+  // as { hub } / { passkeyVerifier }. The copilot route streams through it; the
+  // default is the env-selected provider (getProvider), so existing callers are
+  // unaffected and a unit test can capture the composed prompt with a fake.
+  provider?: LLMProvider;
+};
 
 // Re-exported so the passkey unit tests inject the stub verifier through the
 // same createApp seam as { hub } (spec: specs/passkey.md — 検証器は注入可能に).
@@ -142,7 +150,15 @@ export function createApp(options: CreateAppOptions = {}): App {
     }
     await next();
   });
-  app.route("/api/copilot", createCopilotRouter({ resolveUser, ticketStore: getStore }));
+  app.route(
+    "/api/copilot",
+    createCopilotRouter({
+      resolveUser,
+      ticketStore: getStore,
+      // Injected provider wins; otherwise the env-selected one (mock default).
+      provider: () => options.provider ?? getProvider(),
+    }),
+  );
 
   app.post("/api/chat", async (c) => {
     let body: unknown;

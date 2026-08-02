@@ -6,6 +6,7 @@ import { logout, registerPasskey } from "@/auth/api";
 import { CommandPalette } from "@/components/command-palette";
 import { CopilotPanel } from "@/components/copilot-panel";
 import { Button } from "@/components/ui/button";
+import { setCopilotOpen, toggleCopilotOpen, useCopilotOpen } from "@/lib/copilot-open";
 import { orpc } from "@/lib/orpc";
 import { useRealtimeInvalidation } from "@/lib/realtime";
 import { supportsPasskeys } from "@/lib/webauthn";
@@ -45,16 +46,18 @@ export function AppShell({ user, children }: { user: User; children: React.React
   const isAgent = user.role === "agent";
 
   // copilot (spec: specs/copilot.md): a docked chat, agent-only. The open state
-  // and the Ctrl/⌘+/ toggle live here so a single panel is mounted per shell and
-  // stays open across route changes. Both the button and the shortcut are gated
-  // on isAgent — a customer never sees the launcher and the key is inert.
-  const [copilotOpen, setCopilotOpen] = useState(false);
+  // lives in a module store (lib/copilot-open) rather than useState so the panel
+  // survives a route change — each protected route mounts its own AppShell, so
+  // per-shell state would reset when a SUP-n reference jumps to a ticket. The
+  // Ctrl/⌘+/ toggle and the launcher are both gated on isAgent — a customer never
+  // sees the launcher and the key is inert.
+  const copilotOpen = useCopilotOpen();
   useEffect(() => {
     if (!isAgent) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
-        setCopilotOpen((open) => !open);
+        toggleCopilotOpen();
       }
     };
     window.addEventListener("keydown", onKeyDown);
