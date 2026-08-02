@@ -54,7 +54,12 @@ async function cookieFor(
   return `sid=${sid}`;
 }
 
-function rpc(app: ReturnType<typeof createApp>, procedure: string, input: unknown, cookie?: string) {
+function rpc(
+  app: ReturnType<typeof createApp>,
+  procedure: string,
+  input: unknown,
+  cookie?: string,
+) {
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (cookie) headers.cookie = cookie;
   return app.request(`/api/rpc/tickets/${procedure}`, {
@@ -193,7 +198,12 @@ describe("set-priority: setPriority はエージェント専用 (HTTP面) @featu
     async () => {
       const app = createApp();
       const cookie = await cookieFor(app, SEED.agent);
-      const res = await rpc(app, "setPriority", { id: CUSTOMER_TICKET, priority: "urgent" }, cookie);
+      const res = await rpc(
+        app,
+        "setPriority",
+        { id: CUSTOMER_TICKET, priority: "urgent" },
+        cookie,
+      );
       expect(res.status).toBe(400);
     },
   );

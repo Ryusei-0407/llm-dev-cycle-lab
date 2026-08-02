@@ -1,6 +1,12 @@
 import { StatusBadge } from "@/components/status-badge";
 import type { Label, Ticket, TicketPriority, TicketStatus } from "@/lib/tickets";
 
+const PRIORITY_LABELS: Record<TicketPriority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
 // 担当者メールの表示は @ 前の局所部だけ。未割り当ては en-dash。
 // (ticket-list.tsx の assigneeLabel と同じ流儀。)
 function assigneeLabel(email: string | null): string {
@@ -113,7 +119,9 @@ export function TicketProperties({
               <option value="high">High</option>
             </select>
           ) : (
-            <span className="capitalize">{ticket.priority}</span>
+            // CSS capitalize だと DOM テキストは生値のままになる。セレクトの
+            // ラベル(Low/Medium/High)と同じ表記を実テキストで出す。
+            <span>{PRIORITY_LABELS[ticket.priority]}</span>
           )}
         </Row>
 

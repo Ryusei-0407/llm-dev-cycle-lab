@@ -49,7 +49,9 @@ describe("tickets setPriority input schema @feature-set-priority", () => {
       },
     },
     () => {
-      expect(setPriorityInput.safeParse({ id: "not-a-uuid", priority: "high" }).success).toBe(false);
+      expect(setPriorityInput.safeParse({ id: "not-a-uuid", priority: "high" }).success).toBe(
+        false,
+      );
     },
   );
 

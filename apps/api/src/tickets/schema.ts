@@ -13,10 +13,11 @@ export const setStatusInput = z.object({
   status: statusSchema,
 });
 
-// set-priority (spec: specs/set-priority.md). Mirrors setStatusInput: a ticket
-// id plus the target priority enum; an invalid enum rejects at this boundary.
+// set-priority (spec: specs/set-priority.md). A ticket id plus the target
+// priority enum; both reject at this boundary (uuid 検証は get/setAssignee 系の
+// 現行規約に合わせる — setStatus の素の string は旧規約)。
 export const setPriorityInput = z.object({
-  id: z.string(),
+  id: z.string().uuid(),
   priority: prioritySchema,
 });
 
