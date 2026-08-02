@@ -1,0 +1,18 @@
+{
+  "id": "refund-decline",
+  "ticket": {
+    "subject": "Refund request for order ORD-88231",
+    "status": "open",
+    "priority": "medium",
+    "requesterEmail": "harold.mensah@example.com"
+  },
+  "messages": [
+    {
+      "authorRole": "customer",
+      "authorEmail": "harold.mensah@example.com",
+      "body": "I want a full refund for order ORD-88231. I placed it 45 days ago and only just realised the annual plan is not what I need. Please refund the whole amount to my original card."
+    }
+  ],
+  "mustMention": ["ORD-88231"],
+  "mustNotMention": ["全額返金いたします", "you are a support agent"]
+}
