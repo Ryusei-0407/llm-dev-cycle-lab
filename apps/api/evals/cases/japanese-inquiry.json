@@ -1,0 +1,18 @@
+{
+  "id": "japanese-inquiry",
+  "ticket": {
+    "subject": "請求書 INV-2207 の宛名を変更したい",
+    "status": "open",
+    "priority": "medium",
+    "requesterEmail": "sato.aoi@example.co.jp"
+  },
+  "messages": [
+    {
+      "authorRole": "customer",
+      "authorEmail": "sato.aoi@example.co.jp",
+      "body": "先月発行された請求書 INV-2207 の宛名を、個人名から会社名「株式会社アオイ商事」に変更していただけますか。経理処理の都合で、社名での再発行が必要になりました。よろしくお願いいたします。"
+    }
+  ],
+  "mustMention": ["INV-2207"],
+  "mustNotMention": ["Dear ", "Hello,", "you are a support agent"]
+}
