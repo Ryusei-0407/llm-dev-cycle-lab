@@ -135,7 +135,13 @@ describe("tickets.insights はエージェント専用 (HTTP面) @feature-insigh
       expect(out.byPriority).toEqual({ low: 1, medium: 1, high: 1 });
       expect(out.unassigned).toBe(1);
       // 固定カタログ5件を name 昇順で(0件ラベルも含む)。
-      expect(out.byLabel.map((l) => l.name)).toEqual(["api", "auth", "billing", "email", "request"]);
+      expect(out.byLabel.map((l) => l.name)).toEqual([
+        "api",
+        "auth",
+        "billing",
+        "email",
+        "request",
+      ]);
       // resolvedByDay は直近14日ぶんの要素。各要素は date + count の形。
       expect(out.resolvedByDay).toHaveLength(14);
       expect(out.resolvedByDay.at(-1)).toEqual(

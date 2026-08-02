@@ -173,7 +173,10 @@ describe("store.insights @feature-insights", () => {
     },
     async () => {
       await insertResolvedEvent(TICKET_IDS.login, new Date(NOW.getTime()).toISOString());
-      await insertResolvedEvent(TICKET_IDS.billing, new Date(NOW.getTime() - 3 * DAY).toISOString());
+      await insertResolvedEvent(
+        TICKET_IDS.billing,
+        new Date(NOW.getTime() - 3 * DAY).toISOString(),
+      );
 
       const insights = await store.insights(NOW);
       const byDate = new Map(insights.resolvedByDay.map((d) => [d.date, d.count]));
