@@ -236,6 +236,45 @@ describe("store.insights @feature-insights", () => {
   );
 
   it(
+    "resolved 以外への遷移と別 type のイベントは resolvedByDay に数えない",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "敵対的レビューの反例の固定: 同じ日に to:'in_progress' の status_changed(再オープン)と assignee_changed を挿入しても、その日の count は to:'resolved' の1件分だけであること(type と payload.to の両述語を固定 — どちらかの述語を削る改竄で count が過大になり検知される)",
+      },
+    },
+    async () => {
+      const day = "2026-06-10";
+      await insertResolvedEvent(TICKET_IDS.login, `${day}T09:00:00.000Z`);
+      // 再オープン(to が resolved でない status_changed)— 数えてはならない。
+      await pool.query(
+        `INSERT INTO ticket_events (ticket_id, actor_email, type, payload, created_at)
+         VALUES ($1, 'agent@example.com', 'status_changed', $2::jsonb, $3)`,
+        [
+          TICKET_IDS.billing,
+          JSON.stringify({ from: "resolved", to: "in_progress" }),
+          `${day}T10:00:00.000Z`,
+        ],
+      );
+      // 別 type(assignee_changed)— payload に to があっても数えてはならない。
+      await pool.query(
+        `INSERT INTO ticket_events (ticket_id, actor_email, type, payload, created_at)
+         VALUES ($1, 'agent@example.com', 'assignee_changed', $2::jsonb, $3)`,
+        [
+          TICKET_IDS.feature,
+          JSON.stringify({ from: null, to: "resolved" }),
+          `${day}T11:00:00.000Z`,
+        ],
+      );
+
+      const insights = await store.insights(NOW);
+      const entry = insights.resolvedByDay.find((d) => d.date === day);
+      expect(entry?.count).toBe(1);
+    },
+  );
+
+  it(
     "now 未指定でも現在時刻を既定に集計を返す(注入は任意)",
     {
       annotation: {
