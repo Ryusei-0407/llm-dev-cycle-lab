@@ -244,6 +244,27 @@ test.describe("visual regression @feature-visual @visual", () => {
   );
 
   test(
+    "copilot panel (open)",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "Copilot ドックパネルを開いた状態(入力前の空パネル)を baseline と比較。SSE の逐次表示は VRT に不向きなので送信はしない",
+      },
+    },
+    async ({ page }) => {
+      await stubTicketData(page);
+      await test.step("Copilot パネルを開いて撮影する", async () => {
+        await page.goto("/tickets");
+        await page.getByTestId("copilot-launch").click();
+        await expect(page.getByTestId("copilot-panel")).toBeVisible();
+        await expect(page).toHaveScreenshot("copilot.png", { fullPage: true });
+        await attachShot(page, "copilot");
+      });
+    },
+  );
+
+  test(
     "kanban board",
     {
       annotation: {
