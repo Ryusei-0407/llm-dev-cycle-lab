@@ -123,6 +123,63 @@ test.describe("kanban board @feature-kanban", () => {
   );
 
   test(
+    "空きレーン(カードの無い下部領域)へのドロップでも列移動できる @pinned",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "反例の固定: カラムの高さがカード数分しかなく、カード下に広がるレーン領域がドロップ対象外だった(カードに重ねないと移動できない)。対象列の x 中心 × メインペイン下端近くへのドロップで列移動が成立することを検証",
+      },
+    },
+    async ({ page, request }, testInfo) => {
+      const subject = ownSubject(testInfo);
+      await test.step("レーン検証用のチケットをAPIで作成する", async () => {
+        await createTicket(request, subject);
+      });
+
+      await test.step("ボードを開きカードを確認する", async () => {
+        await page.goto("/board");
+        await expect(
+          page
+            .getByTestId("kanban-column-open")
+            .getByTestId("kanban-card")
+            .filter({ hasText: subject }),
+        ).toBeVisible();
+      });
+
+      await test.step("In progress 列の下部レーン(空き領域)へドロップする", async () => {
+        const main = page.locator("main");
+        const mainBox = await main.boundingBox();
+        const colBox = await page.getByTestId("kanban-column-in_progress").boundingBox();
+        if (!mainBox || !colBox) throw new Error("bounding box unavailable");
+        // 幾何の固定: 列がメインペインの残り全高まで伸びていること。比率では
+        // なく絶対値で見る — main ごと内容高さに潰れる環境では比率が縮退し、
+        // 「短い列のまま」でも下のドロップ検証が空虚に通ってしまう
+        // (viewport 720px・ヘッダ約60px が前提。CI/ローカルの描画差の検出も兼ねる)。
+        console.log(`[lane-pin] mainH=${mainBox.height} colH=${colBox.height}`);
+        expect(colBox.height).toBeGreaterThan(500);
+        await page
+          .getByTestId("kanban-column-open")
+          .getByTestId("kanban-card")
+          .filter({ hasText: subject })
+          .dragTo(main, {
+            targetPosition: {
+              x: colBox.x - mainBox.x + colBox.width / 2,
+              y: mainBox.height - 30,
+            },
+          });
+        await expect(
+          page
+            .getByTestId("kanban-column-in_progress")
+            .getByTestId("kanban-card")
+            .filter({ hasText: subject }),
+        ).toBeVisible();
+        await snap(page, testInfo, "レーンへのドロップ後");
+      });
+    },
+  );
+
+  test(
     "shows board-error and keeps the card in place when setStatus fails",
     {
       annotation: {

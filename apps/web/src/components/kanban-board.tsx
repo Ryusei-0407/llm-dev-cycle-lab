@@ -73,13 +73,19 @@ export function KanbanBoard({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    // 列(li)がドロップ対象なので、レーンはメインペインの残り全高まで
+    // 伸ばす。カード数ぶんの高さしか無いと、カード下の広い空き領域が
+    // li の外=ドロップ不能になり「カードに重ねないと移動できない」体験になる。
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {error && (
         <p data-testid="board-error" role="alert" className="text-sm text-destructive">
           Failed to update ticket status.
         </p>
       )}
-      <ul data-testid="kanban-board" className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <ul
+        data-testid="kanban-board"
+        className="grid flex-1 auto-rows-fr grid-cols-1 gap-4 md:grid-cols-3"
+      >
         {COLUMNS.map((column) => {
           const cards = items.filter((t) => t.status === column.status);
           return (
@@ -88,8 +94,13 @@ export function KanbanBoard({
               data-testid={`kanban-column-${column.status}`}
               // preventDefault on dragover marks the column a valid drop target
               // (without it the browser rejects the drop); the BM test fires a
-              // cancelable dragover to exercise exactly this.
-              onDragOver={(e) => e.preventDefault()}
+              // cancelable dragover to exercise exactly this. dropEffect must be
+              // set explicitly — some browsers resolve it to "none" otherwise and
+              // reject the drop even after preventDefault.
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
               onDrop={(e) => onDrop(e, column.status)}
               className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 p-3"
             >
