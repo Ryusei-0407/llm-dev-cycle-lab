@@ -97,4 +97,22 @@ describe("evals-expansion quota watchdog", () => {
       expect(cases.length).toBe(12);
     },
   );
+
+  it(
+    "japanese-inquiry のスレッド本文は日本語を含む(言語一貫性の固定)",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "敵対的レビューの参考指摘の固定: 仕様は japanese-inquiry を日本語スレッド必須と定めるが、本文を全文英語化する改竄が全テスト緑のままだった。本文連結に日本語文字(ひらがな/カタカナ/漢字)が含まれることを検証",
+      },
+    },
+    () => {
+      const cases = loadCases(bundledDir);
+      const target = cases.find((c) => c.id === "japanese-inquiry");
+      expect(target).toBeDefined();
+      const body = (target?.messages ?? []).map((m) => m.body).join("\n");
+      expect(body).toMatch(/[ぁ-んァ-ヶ一-龯]/);
+    },
+  );
 });
