@@ -106,6 +106,31 @@ test(
 );
 
 test(
+  "priority_changed イベントを『優先度: {from} → {to}』で描画する",
+  {
+    annotation: {
+      type: "description",
+      description:
+        "priority_changed イベントが ticket-event 行として『優先度: medium → high』(low/medium/high の生値・完全一致)で描画されることを検証(spec: specs/set-priority.md UI イベント行文言)",
+    },
+  },
+  async () => {
+    renderThread([
+      {
+        id: "e1",
+        type: "priority_changed",
+        actorEmail: "agent@example.com",
+        payload: { from: "medium", to: "high" },
+        createdAt: "2026-01-03T00:03:00.000Z",
+      },
+    ]);
+    await expect
+      .element(page.getByTestId("ticket-event"))
+      .toHaveTextContent("優先度: medium → high");
+  },
+);
+
+test(
   "labels_changed イベントを ', ' 結合で描画し、空は『ラベル: なし』にする",
   {
     annotation: {

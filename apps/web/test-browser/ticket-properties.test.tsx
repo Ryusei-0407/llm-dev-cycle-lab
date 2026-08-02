@@ -57,6 +57,7 @@ test(
     const onStatusChange = vi.fn();
     const onAssigneeChange = vi.fn();
     const onLabelsChange = vi.fn();
+    const onPriorityChange = vi.fn();
     // render() は同期に結果を返すが lint 型上は thenable 扱いなので void で明示破棄する。
     void render(
       <TicketProperties
@@ -67,12 +68,14 @@ test(
         onStatusChange={onStatusChange}
         onAssigneeChange={onAssigneeChange}
         onLabelsChange={onLabelsChange}
+        onPriorityChange={onPriorityChange}
       />,
     );
 
     // 各コントロールが可視であること(存在の下限)。
     await expect.element(page.getByTestId("ticket-status-select")).toBeVisible();
     await expect.element(page.getByTestId("assignee-select")).toBeVisible();
+    await expect.element(page.getByTestId("priority-select")).toBeVisible();
     for (const label of CATALOG) {
       await expect.element(page.getByTestId(`label-toggle-${label.name}`)).toBeVisible();
     }
@@ -80,6 +83,10 @@ test(
     // 状態変更: 生値 in_progress でコールバック。
     await page.getByTestId("ticket-status-select").selectOptions("in_progress");
     expect(onStatusChange).toHaveBeenLastCalledWith("in_progress");
+
+    // 優先度変更: 生値でコールバック。TICKET.priority は high なので別値 low を選ぶ。
+    await page.getByTestId("priority-select").selectOptions("low");
+    expect(onPriorityChange).toHaveBeenLastCalledWith("low");
 
     // 担当者変更: 別 agent の email。
     await page.getByTestId("assignee-select").selectOptions("second@example.com");
@@ -120,6 +127,7 @@ test(
         onStatusChange={vi.fn()}
         onAssigneeChange={vi.fn()}
         onLabelsChange={vi.fn()}
+        onPriorityChange={vi.fn()}
       />,
     );
 
@@ -153,6 +161,7 @@ test(
         onStatusChange={vi.fn()}
         onAssigneeChange={vi.fn()}
         onLabelsChange={vi.fn()}
+        onPriorityChange={vi.fn()}
       />,
     );
 
@@ -160,9 +169,10 @@ test(
     await expect.element(page.getByTestId("ticket-properties")).toBeVisible();
     expect(page.getByTestId("ticket-status-select").elements()).toHaveLength(0);
     expect(page.getByTestId("assignee-select").elements()).toHaveLength(0);
+    expect(page.getByTestId("priority-select").elements()).toHaveLength(0);
     expect(page.getByTestId(/^label-toggle-/).elements()).toHaveLength(0);
 
-    // 閲覧表示: 状態バッジ・付与済みラベルチップ・依頼者。
+    // 閲覧表示: 状態バッジ・付与済みラベルチップ・依頼者・優先度テキスト(capitalize)。
     await expect.element(page.getByTestId("status-badge")).toBeVisible();
     await expect
       .element(page.getByTestId("ticket-labels").getByTestId("ticket-label").first())
@@ -170,5 +180,7 @@ test(
     await expect
       .element(page.getByTestId("ticket-requester"))
       .toHaveTextContent("customer@example.com");
+    // TICKET.priority は high。customer は生値でなく capitalize 表示のみ。
+    await expect.element(page.getByTestId("ticket-properties")).toHaveTextContent("High");
   },
 );
