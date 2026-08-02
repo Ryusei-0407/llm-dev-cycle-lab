@@ -152,6 +152,10 @@ test.describe("kanban board @feature-kanban", () => {
         const mainBox = await main.boundingBox();
         const colBox = await page.getByTestId("kanban-column-in_progress").boundingBox();
         if (!mainBox || !colBox) throw new Error("bounding box unavailable");
+        // 幾何の固定: 列がメインペインの残り全高まで伸びていること。これが
+        // 無いと、main が内容高さに潰れる環境ではドロップ点の計算が縮退し、
+        // 「短い列のまま」でも下のドロップ検証が空虚に通ってしまう。
+        expect(colBox.height).toBeGreaterThan(mainBox.height * 0.7);
         await page
           .getByTestId("kanban-column-open")
           .getByTestId("kanban-card")
