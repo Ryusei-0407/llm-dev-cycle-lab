@@ -1,5 +1,5 @@
 import { StatusBadge } from "@/components/status-badge";
-import type { Label, Ticket, TicketStatus } from "@/lib/tickets";
+import type { Label, Ticket, TicketPriority, TicketStatus } from "@/lib/tickets";
 
 // 担当者メールの表示は @ 前の局所部だけ。未割り当ては en-dash。
 // (ticket-list.tsx の assigneeLabel と同じ流儀。)
@@ -36,6 +36,7 @@ export function TicketProperties({
   agents,
   labelCatalog,
   onStatusChange,
+  onPriorityChange,
   onAssigneeChange,
   onLabelsChange,
 }: {
@@ -44,6 +45,7 @@ export function TicketProperties({
   agents: { email: string; name: string }[];
   labelCatalog: Label[];
   onStatusChange: (status: TicketStatus) => void;
+  onPriorityChange: (priority: TicketPriority) => void;
   onAssigneeChange: (assigneeEmail: string | null) => void;
   onLabelsChange: (labels: string[]) => void;
 }) {
@@ -98,7 +100,21 @@ export function TicketProperties({
         </Row>
 
         <Row label="優先度">
-          <span className="capitalize">{ticket.priority}</span>
+          {isAgent ? (
+            <select
+              data-testid="priority-select"
+              aria-label="Priority"
+              value={ticket.priority}
+              onChange={(e) => onPriorityChange(e.target.value as TicketPriority)}
+              className="h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          ) : (
+            <span className="capitalize">{ticket.priority}</span>
+          )}
         </Row>
 
         <Row label="担当者">

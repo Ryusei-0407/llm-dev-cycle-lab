@@ -13,6 +13,13 @@ export const setStatusInput = z.object({
   status: statusSchema,
 });
 
+// set-priority (spec: specs/set-priority.md). Mirrors setStatusInput: a ticket
+// id plus the target priority enum; an invalid enum rejects at this boundary.
+export const setPriorityInput = z.object({
+  id: z.string(),
+  priority: prioritySchema,
+});
+
 // ticket-detail (spec: specs/ticket-detail.md サーバー契約). get takes a ticket
 // id; reply takes the target ticket + the message body (author is session-
 // derived, never part of the input).
@@ -64,6 +71,7 @@ export const searchInput = z.object({
 
 export type CreateInput = z.infer<typeof createInput>;
 export type SetStatusInput = z.infer<typeof setStatusInput>;
+export type SetPriorityInput = z.infer<typeof setPriorityInput>;
 export type GetInput = z.infer<typeof getInput>;
 export type ReplyInput = z.infer<typeof replyInput>;
 export type SetAssigneeInput = z.infer<typeof setAssigneeInput>;

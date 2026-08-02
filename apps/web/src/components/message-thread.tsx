@@ -37,6 +37,10 @@ function eventText(event: TicketEvent): string {
       const { to } = event.payload as { to: string[] };
       return `ラベル: ${to.length > 0 ? to.join(", ") : "なし"}`;
     }
+    case "priority_changed": {
+      const { from, to } = event.payload as { from: string; to: string };
+      return `優先度: ${from} → ${to}`;
+    }
   }
 }
 
