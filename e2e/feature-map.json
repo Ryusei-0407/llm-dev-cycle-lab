@@ -122,6 +122,11 @@
     "apps/web/src/components/app-shell.tsx",
     "e2e/tests/copilot.spec.ts"
   ],
+  "copilot-suggest": [
+    "apps/web/src/components/copilot-panel.tsx",
+    "apps/web/src/lib/copilot-open.ts",
+    "e2e/tests/copilot-suggest.spec.ts"
+  ],
   "insights": [
     "apps/api/src/tickets/store.ts",
     "apps/api/src/tickets/router.ts",
