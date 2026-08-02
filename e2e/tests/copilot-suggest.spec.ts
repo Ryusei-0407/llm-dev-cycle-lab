@@ -37,12 +37,11 @@ test.describe("copilot suggest @feature-copilot-suggest", () => {
         await page.getByTestId("copilot-launch").click();
         await expect(page.getByTestId("copilot-panel")).toBeVisible();
         await expect(page.getByTestId("copilot-suggest-heading")).toContainText("よくある質問");
-        // チップは同一 testid 3つ。件数と各文言の存在で確認する。
+        // チップは同一 testid 3つ。ラベルは順序込みで完全一致を固定する
+        // (部分一致だと文言改竄が生き残る — 敵対的レビューの反例)。
         await expect(page.getByTestId("copilot-suggestion")).toHaveCount(3);
-        for (const text of SUGGESTIONS) {
-          await expect(
-            page.getByTestId("copilot-suggestion").filter({ hasText: text }),
-          ).toBeVisible();
+        for (const [i, text] of SUGGESTIONS.entries()) {
+          await expect(page.getByTestId("copilot-suggestion").nth(i)).toHaveText(text);
         }
         // 会話が空なのでクリアボタンは無い。
         await expect(page.getByTestId("copilot-clear")).toHaveCount(0);
@@ -70,9 +69,13 @@ test.describe("copilot suggest @feature-copilot-suggest", () => {
       });
 
       await test.step("クリアで会話が空に戻り提案チップが再表示される", async () => {
+        // 反例の固定: クリアは入力欄の下書きに影響しない(仕様 MUST)。下書きを
+        // 入れてからクリアし、値が残ることを見る。
+        await page.getByTestId("copilot-input").fill("下書きは残る");
         // 会話が1件以上あるのでクリアボタンが出る。
         await page.getByTestId("copilot-clear").click();
         await expect(page.getByTestId("copilot-user")).toHaveCount(0);
+        await expect(page.getByTestId("copilot-input")).toHaveValue("下書きは残る");
         await expect(page.getByTestId("copilot-assistant")).toHaveCount(0);
         await expect(page.getByTestId("copilot-suggest-heading")).toContainText("よくある質問");
         await expect(page.getByTestId("copilot-suggestion")).toHaveCount(3);
@@ -103,6 +106,14 @@ test.describe("copilot suggest @feature-copilot-suggest", () => {
     },
     async ({ page }, testInfo) => {
       await test.step("チップで1往復してからクリアする", async () => {
+        // 反例の固定: ストリーミング中はクリアが disabled(仕様 MUST)。モックの
+        // 応答は速すぎて観測できないため、SSE ルートを 800ms 遅延させて
+        // ストリーミング中の時間窓を確保する(以後の送信にも同じ遅延が乗るだけで
+        // 挙動は不変 — 固定待ちではなく状態アサーションで検証する)。
+        await page.route("**/api/copilot/chat", async (route) => {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          await route.continue();
+        });
         await page.goto("/tickets");
         await page.getByTestId("copilot-launch").click();
         await expect(page.getByTestId("copilot-panel")).toBeVisible();
@@ -110,10 +121,29 @@ test.describe("copilot suggest @feature-copilot-suggest", () => {
           .getByTestId("copilot-suggestion")
           .filter({ hasText: CLICKED_SUGGESTION })
           .click();
+        // 発話直後(応答待ち)の窓でクリアが disabled であること。
+        await expect(page.getByTestId("copilot-clear")).toBeDisabled();
         await expect(page.getByTestId("copilot-assistant")).toContainText(FIXED_LINE);
+        // ストリーミング完了後は enabled に戻る。
+        await expect(page.getByTestId("copilot-clear")).toBeEnabled();
         await page.getByTestId("copilot-clear").click();
         await expect(page.getByTestId("copilot-user")).toHaveCount(0);
         await snap(page, testInfo, "クリア後");
+      });
+
+      await test.step("残り2つのチップも各々その文言をそのまま送信する", async () => {
+        // 反例の固定: クリックされないチップの送信文言が無検証だった。チップは
+        // 1会話に1回しか押せないため、クリアを挟んで残り2つを順に検証する
+        // (copilot-user の完全一致 = 「その文言をそのまま送信」の固定)。
+        for (const text of SUGGESTIONS) {
+          if (text === CLICKED_SUGGESTION) continue;
+          await page.getByTestId("copilot-suggestion").filter({ hasText: text }).click();
+          await expect(page.getByTestId("copilot-user")).toHaveText(text);
+          await expect(page.getByTestId("copilot-assistant")).toContainText(FIXED_LINE);
+          await page.getByTestId("copilot-clear").click();
+          await expect(page.getByTestId("copilot-user")).toHaveCount(0);
+        }
+        await snap(page, testInfo, "全チップの送信文言検証");
       });
 
       await test.step("入力欄から手動送信すると新しい1往復だけ表示される", async () => {
