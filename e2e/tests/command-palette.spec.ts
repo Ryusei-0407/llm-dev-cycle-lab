@@ -58,8 +58,14 @@ test.describe("command-palette @feature-command-palette", () => {
         await snap(page, testInfo, "チケット検索ヒット");
       });
 
-      await test.step("チケット行クリックで詳細へ遷移しパレットが閉じる", async () => {
-        await page.getByTestId("palette-ticket").filter({ hasText: "Billing question" }).click();
+      await test.step("Enter で先頭の検索ヒットが選ばれ詳細へ遷移しパレットが閉じる", async () => {
+        // 反例の固定: ナビ項目が検索語で絞り込まれないと、Enter は常に先頭の
+        // ナビ(受信トレイ)を選んでしまい検索が「効かない」体験になる。
+        // キーボード確定で検索ヒットに遷移することを主経路として固定する。
+        await expect(
+          page.getByTestId("palette-ticket").filter({ hasText: "Billing question" }),
+        ).toBeVisible();
+        await page.keyboard.press("Enter");
         await expect(page.getByTestId("ticket-subject")).toHaveText("Billing question");
         await expect(page).toHaveURL(/\/tickets\//);
         // 選択でパレットは閉じる。
