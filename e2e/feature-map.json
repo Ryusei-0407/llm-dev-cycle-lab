@@ -69,5 +69,6 @@
   "visual": ["apps/web/src/**", "e2e/tests/visual.spec.ts", "e2e/components/visual.spec.ts"],
   "app-shell": ["apps/web/src/**", "e2e/tests/app-shell.spec.ts"],
   "triage": ["apps/api/**", "apps/web/src/**", "e2e/tests/triage.spec.ts"],
-  "command-palette": ["apps/api/**", "apps/web/src/**", "e2e/tests/command-palette.spec.ts"]
+  "command-palette": ["apps/api/**", "apps/web/src/**", "e2e/tests/command-palette.spec.ts"],
+  "copilot": ["apps/api/**", "apps/web/src/**", "e2e/tests/copilot.spec.ts"]
 }
