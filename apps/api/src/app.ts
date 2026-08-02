@@ -11,6 +11,7 @@ import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
 import { createRealtimeHub, type RealtimeHub } from "./realtime.js";
 import { serverTiming } from "./server-timing.js";
+import { createCopilotRouter } from "./tickets/copilot.js";
 import { createDraftRouter } from "./tickets/draft.js";
 import {
   createTicketsRouter,
@@ -38,7 +39,15 @@ function getProvider(): LLMProvider {
 // tickets router broadcasts ticket changes through it, and unit tests inject a
 // recording hub to observe those broadcasts without opening a socket. Default —
 // a fresh in-memory hub — leaves existing callers (index.ts) unaffected.
-export type CreateAppOptions = { hub?: RealtimeHub; passkeyVerifier?: PasskeyVerifier };
+export type CreateAppOptions = {
+  hub?: RealtimeHub;
+  passkeyVerifier?: PasskeyVerifier;
+  // copilot (spec: specs/copilot.md): an injectable LLMProvider, the same idiom
+  // as { hub } / { passkeyVerifier }. The copilot route streams through it; the
+  // default is the env-selected provider (getProvider), so existing callers are
+  // unaffected and a unit test can capture the composed prompt with a fake.
+  provider?: LLMProvider;
+};
 
 // Re-exported so the passkey unit tests inject the stub verifier through the
 // same createApp seam as { hub } (spec: specs/passkey.md — 検証器は注入可能に).
@@ -129,6 +138,26 @@ export function createApp(options: CreateAppOptions = {}): App {
   app.route(
     "/api/tickets",
     createDraftRouter({ resolveUser, ticketStore: getStore, messageStore: getMessageStore }),
+  );
+
+  // copilot (spec: specs/copilot.md): POST /api/copilot/chat streams a
+  // status answer as SSE, grounded on the SQL snapshot. Same DB guard as
+  // /api/tickets/* — a missing DATABASE_URL is 500 db_misconfigured before any
+  // store query, never a silent failure.
+  app.use("/api/copilot/*", async (c, next) => {
+    if (!isDbConfigured()) {
+      return c.json({ error: "db_misconfigured" }, 500);
+    }
+    await next();
+  });
+  app.route(
+    "/api/copilot",
+    createCopilotRouter({
+      resolveUser,
+      ticketStore: getStore,
+      // Injected provider wins; otherwise the env-selected one (mock default).
+      provider: () => options.provider ?? getProvider(),
+    }),
   );
 
   app.post("/api/chat", async (c) => {
