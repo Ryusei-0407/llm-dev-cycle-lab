@@ -178,6 +178,16 @@ export type ListPageArgs = {
 
 export type AgentRef = { email: string; name: string };
 
+// copilot support snapshot (spec: specs/copilot.md). The numbers the LLM is
+// allowed to cite come only from this SQL aggregate — the model never counts.
+export type CopilotSnapshot = {
+  byStatus: { open: number; in_progress: number; resolved: number };
+  byPriority: { low: number; medium: number; high: number };
+  unassigned: number;
+  resolvedLast7d: number;
+  stale: Array<{ number: number; subject: string; status: string }>;
+};
+
 export function createTicketStore(pool: Pool) {
   // Load one ticket (with labels) by id, or null. Shared by getById and by the
   // mutations that re-read the row after an UPDATE to return the wire shape.
@@ -490,6 +500,61 @@ export function createTicketStore(pool: Pool) {
         `SELECT count(*) FROM tickets WHERE assignee_email IS NULL AND status <> 'resolved'`,
       );
       return Number(rows[0].count);
+    },
+
+    // copilot support snapshot (spec: specs/copilot.md). now is injected so the
+    // 7-day / 48-hour windows are deterministic under test (default new Date()).
+    // The counts and the stale list are read in one round trip each; all time
+    // comparisons are bound as params so the same query runs for any `now`.
+    // resolvedLast7d counts resolved tickets whose updated_at is within 7 days
+    // of now; stale is unresolved tickets untouched for 48h, oldest-first, top 5.
+    async copilotSnapshot(now: Date = new Date()): Promise<CopilotSnapshot> {
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+
+      const counts = await pool.query<{
+        status: TicketStatus;
+        priority: TicketPriority;
+        count: string;
+      }>(`SELECT status, priority, count(*) AS count FROM tickets GROUP BY status, priority`);
+
+      const byStatus = { open: 0, in_progress: 0, resolved: 0 };
+      const byPriority = { low: 0, medium: 0, high: 0 };
+      for (const row of counts.rows) {
+        const n = Number(row.count);
+        byStatus[row.status] += n;
+        byPriority[row.priority] += n;
+      }
+
+      const { rows: unassignedRows } = await pool.query<{ count: string }>(
+        `SELECT count(*) AS count FROM tickets WHERE assignee_email IS NULL AND status <> 'resolved'`,
+      );
+      const unassigned = Number(unassignedRows[0].count);
+
+      const { rows: resolvedRows } = await pool.query<{ count: string }>(
+        `SELECT count(*) AS count FROM tickets WHERE status = 'resolved' AND updated_at >= $1`,
+        [sevenDaysAgo],
+      );
+      const resolvedLast7d = Number(resolvedRows[0].count);
+
+      const { rows: staleRows } = await pool.query<{
+        number: string | number;
+        subject: string;
+        status: TicketStatus;
+      }>(
+        `SELECT number, subject, status FROM tickets
+          WHERE status <> 'resolved' AND updated_at <= $1
+          ORDER BY updated_at ASC, id ASC
+          LIMIT 5`,
+        [fortyEightHoursAgo],
+      );
+      const stale = staleRows.map((r) => ({
+        number: Number(r.number),
+        subject: r.subject,
+        status: r.status,
+      }));
+
+      return { byStatus, byPriority, unassigned, resolvedLast7d, stale };
     },
   };
 }

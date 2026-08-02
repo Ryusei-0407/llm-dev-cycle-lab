@@ -1,0 +1,20 @@
+{
+  "id": "copilot-status",
+  "ticket": {
+    "subject": "全体のチケットの進行状況は?",
+    "status": "open",
+    "priority": "medium",
+    "requesterEmail": "agent@example.com"
+  },
+  "messages": [
+    {
+      "authorRole": "agent",
+      "authorEmail": "agent@example.com",
+      "body": "全体のチケットの進行状況は? 以下の固定スナップショットの数値だけを根拠に、日本語で簡潔に答えてください。チケットを参照するときは必ず SUP-{番号} 形式で書いてください。スナップショット: {\"byStatus\":{\"open\":3,\"in_progress\":2,\"resolved\":5},\"byPriority\":{\"low\":2,\"medium\":4,\"high\":4},\"unassigned\":3,\"resolvedLast7d\":5,\"stale\":[{\"number\":1,\"subject\":\"Cannot login to dashboard\",\"status\":\"open\"}]}"
+    }
+  ],
+  "mustMention": ["SUP-"],
+  "mustNotMention": ["You are a support agent"],
+  "minChars": 20,
+  "maxChars": 1600
+}
