@@ -188,6 +188,24 @@ export type CopilotSnapshot = {
   stale: Array<{ number: number; subject: string; status: string }>;
 };
 
+// insights dashboard aggregate (spec: specs/insights.md). Same numeric-ground-
+// truth idea as CopilotSnapshot but shaped for the charts: status/priority
+// tallies, the unassigned backlog, every label's count (0 included), and a
+// 14-day resolved trend. now is injected so the trend's day window is
+// deterministic under test (default new Date()).
+export type InsightsResult = {
+  byStatus: { open: number; in_progress: number; resolved: number };
+  byPriority: { low: number; medium: number; high: number };
+  unassigned: number;
+  byLabel: Array<{ name: string; color: string; count: number }>;
+  resolvedByDay: Array<{ date: string; count: number }>;
+};
+
+// UTC calendar day ("YYYY-MM-DD") of an instant — the trend buckets by this.
+function utcDay(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
 export function createTicketStore(pool: Pool) {
   // Load one ticket (with labels) by id, or null. Shared by getById and by the
   // mutations that re-read the row after an UPDATE to return the wire shape.
@@ -555,6 +573,78 @@ export function createTicketStore(pool: Pool) {
       }));
 
       return { byStatus, byPriority, unassigned, resolvedLast7d, stale };
+    },
+
+    // insights dashboard aggregate (spec: specs/insights.md). now is injected so
+    // the 14-day trend window is deterministic (default new Date()). byStatus/
+    // byPriority/unassigned mirror copilotSnapshot's counts; byLabel is a LEFT
+    // JOIN off the closed label catalogue so a 0-count label still appears,
+    // name-sorted. resolvedByDay counts, per UTC day, the tickets that changed
+    // to 'resolved' via a status_changed event (payload->>'to' = 'resolved'),
+    // de-duplicated so a ticket resolved twice in one day counts once; the 14
+    // days ending today are then 0-filled and returned ascending.
+    async insights(now: Date = new Date()): Promise<InsightsResult> {
+      const counts = await pool.query<{
+        status: TicketStatus;
+        priority: TicketPriority;
+        count: string;
+      }>(`SELECT status, priority, count(*) AS count FROM tickets GROUP BY status, priority`);
+
+      const byStatus = { open: 0, in_progress: 0, resolved: 0 };
+      const byPriority = { low: 0, medium: 0, high: 0 };
+      for (const row of counts.rows) {
+        const n = Number(row.count);
+        byStatus[row.status] += n;
+        byPriority[row.priority] += n;
+      }
+
+      const { rows: unassignedRows } = await pool.query<{ count: string }>(
+        `SELECT count(*) AS count FROM tickets WHERE assignee_email IS NULL AND status <> 'resolved'`,
+      );
+      const unassigned = Number(unassignedRows[0].count);
+
+      const { rows: labelRows } = await pool.query<{
+        name: string;
+        color: string;
+        count: string;
+      }>(
+        `SELECT l.name, l.color, count(tl.ticket_id) AS count
+           FROM labels l LEFT JOIN ticket_labels tl ON tl.label_id = l.id
+          GROUP BY l.name, l.color
+          ORDER BY l.name ASC`,
+      );
+      const byLabel = labelRows.map((r) => ({
+        name: r.name,
+        color: r.color,
+        count: Number(r.count),
+      }));
+
+      // 14 UTC days ending today (inclusive). The window's lower bound is the
+      // midnight 13 days back, bound as a param so only in-window events load.
+      const today = utcDay(now);
+      const windowStart = new Date(`${today}T00:00:00.000Z`);
+      windowStart.setUTCDate(windowStart.getUTCDate() - 13);
+
+      const { rows: resolvedRows } = await pool.query<{ day: string; count: string }>(
+        `SELECT to_char((e.created_at AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS day,
+                count(DISTINCT e.ticket_id) AS count
+           FROM ticket_events e
+          WHERE e.type = 'status_changed'
+            AND e.payload->>'to' = 'resolved'
+            AND e.created_at >= $1
+          GROUP BY day`,
+        [windowStart.toISOString()],
+      );
+      const countByDay = new Map(resolvedRows.map((r) => [r.day, Number(r.count)]));
+      const resolvedByDay: Array<{ date: string; count: number }> = [];
+      for (let i = 0; i < 14; i++) {
+        const d = new Date(windowStart);
+        d.setUTCDate(d.getUTCDate() + i);
+        const date = utcDay(d);
+        resolvedByDay.push({ date, count: countByDay.get(date) ?? 0 });
+      }
+
+      return { byStatus, byPriority, unassigned, byLabel, resolvedByDay };
     },
   };
 }

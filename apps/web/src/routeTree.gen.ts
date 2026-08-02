@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BoardRouteImport } from './routes/board'
 import { Route as InboxRouteImport } from './routes/inbox'
+import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as TicketsRouteImport } from './routes/tickets'
 import { Route as TicketsIdRouteImport } from './routes/tickets_.$id'
@@ -29,6 +30,11 @@ const BoardRoute = BoardRouteImport.update({
 const InboxRoute = InboxRouteImport.update({
   id: '/inbox',
   path: '/inbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InsightsRoute = InsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/board': typeof BoardRoute
   '/inbox': typeof InboxRoute
+  '/insights': typeof InsightsRoute
   '/login': typeof LoginRoute
   '/tickets': typeof TicketsRoute
   '/tickets/$id': typeof TicketsIdRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/board': typeof BoardRoute
   '/inbox': typeof InboxRoute
+  '/insights': typeof InsightsRoute
   '/login': typeof LoginRoute
   '/tickets': typeof TicketsRoute
   '/tickets/$id': typeof TicketsIdRoute
@@ -68,20 +76,36 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/board': typeof BoardRoute
   '/inbox': typeof InboxRoute
+  '/insights': typeof InsightsRoute
   '/login': typeof LoginRoute
   '/tickets': typeof TicketsRoute
   '/tickets_/$id': typeof TicketsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/board' | '/inbox' | '/login' | '/tickets' | '/tickets/$id'
+  fullPaths:
+    | '/'
+    | '/board'
+    | '/inbox'
+    | '/insights'
+    | '/login'
+    | '/tickets'
+    | '/tickets/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/board' | '/inbox' | '/login' | '/tickets' | '/tickets/$id'
+  to:
+    | '/'
+    | '/board'
+    | '/inbox'
+    | '/insights'
+    | '/login'
+    | '/tickets'
+    | '/tickets/$id'
   id:
     | '__root__'
     | '/'
     | '/board'
     | '/inbox'
+    | '/insights'
     | '/login'
     | '/tickets'
     | '/tickets_/$id'
@@ -91,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BoardRoute: typeof BoardRoute
   InboxRoute: typeof InboxRoute
+  InsightsRoute: typeof InsightsRoute
   LoginRoute: typeof LoginRoute
   TicketsRoute: typeof TicketsRoute
   TicketsIdRoute: typeof TicketsIdRoute
@@ -117,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/inbox'
       fullPath: '/inbox'
       preLoaderRoute: typeof InboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/insights': {
+      id: '/insights'
+      path: '/insights'
+      fullPath: '/insights'
+      preLoaderRoute: typeof InsightsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -147,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BoardRoute: BoardRoute,
   InboxRoute: InboxRoute,
+  InsightsRoute: InsightsRoute,
   LoginRoute: LoginRoute,
   TicketsRoute: TicketsRoute,
   TicketsIdRoute: TicketsIdRoute,

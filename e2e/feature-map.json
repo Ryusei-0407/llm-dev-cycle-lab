@@ -70,5 +70,6 @@
   "app-shell": ["apps/web/src/**", "e2e/tests/app-shell.spec.ts"],
   "triage": ["apps/api/**", "apps/web/src/**", "e2e/tests/triage.spec.ts"],
   "command-palette": ["apps/api/**", "apps/web/src/**", "e2e/tests/command-palette.spec.ts"],
-  "copilot": ["apps/api/**", "apps/web/src/**", "e2e/tests/copilot.spec.ts"]
+  "copilot": ["apps/api/**", "apps/web/src/**", "e2e/tests/copilot.spec.ts"],
+  "insights": ["apps/api/**", "apps/web/src/**", "e2e/tests/insights.spec.ts"]
 }
