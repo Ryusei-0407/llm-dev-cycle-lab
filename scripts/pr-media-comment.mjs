@@ -390,7 +390,19 @@ function publishMedia() {
     ],
     { cwd: work },
   );
-  sh("git", ["push", "-q", "origin", MEDIA_BRANCH], { cwd: work });
+  // 並走する別 PR の run が同じ ci-media へ push すると non-fast-forward で
+  // 落ちる(実害: 2 PR 同時 CI で片方のジョブが赤化)。メディアは run ごとに
+  // 独立ディレクトリなので、リベースして積み直せば衝突しない — pull --rebase
+  // してからリトライする。
+  for (let attempt = 1; ; attempt++) {
+    try {
+      sh("git", ["push", "-q", "origin", MEDIA_BRANCH], { cwd: work });
+      break;
+    } catch (err) {
+      if (attempt >= 5) throw err;
+      sh("git", ["pull", "-q", "--rebase", "origin", MEDIA_BRANCH], { cwd: work });
+    }
+  }
   rmSync(work, { recursive: true, force: true });
 }
 
