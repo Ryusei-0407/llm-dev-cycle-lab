@@ -43,11 +43,16 @@ export type Ticket = {
 // Activity log (spec: specs/ticket-model.md). payload is the discriminated
 // union the wire uses verbatim; the store persists it as jsonb and reads it
 // back untouched.
-export type TicketEventType = "status_changed" | "assignee_changed" | "labels_changed";
+export type TicketEventType =
+  | "status_changed"
+  | "assignee_changed"
+  | "labels_changed"
+  | "priority_changed";
 export type TicketEventPayload =
   | { from: TicketStatus; to: TicketStatus }
   | { from: string | null; to: string | null }
-  | { from: string[]; to: string[] };
+  | { from: string[]; to: string[] }
+  | { from: TicketPriority; to: TicketPriority };
 
 export type TicketEvent = {
   id: string;
@@ -379,6 +384,33 @@ export function createTicketStore(pool: Pool) {
         await insertEvent(client, id, actorEmail, "status_changed", {
           from: current.status,
           to: status,
+        });
+        const updated = await loadByIdOn(client, id);
+        if (!updated) throw new NotFoundError(id);
+        return updated;
+      });
+    },
+
+    // Same-value change (medium→medium) is a no-op: no event, no updated_at
+    // bump, returns the current ticket successfully (spec). A real change writes
+    // the priority_changed event and the UPDATE in one transaction. actorEmail
+    // is optional (defaults "system") — same signature convention as setStatus.
+    async setPriority(
+      id: string,
+      priority: TicketPriority,
+      actorEmail = "system",
+    ): Promise<Ticket> {
+      const current = await loadById(id);
+      if (!current) throw new NotFoundError(id);
+      if (current.priority === priority) return current;
+      return withTransaction(pool, async (client) => {
+        await client.query(`UPDATE tickets SET priority = $2, updated_at = now() WHERE id = $1`, [
+          id,
+          priority,
+        ]);
+        await insertEvent(client, id, actorEmail, "priority_changed", {
+          from: current.priority,
+          to: priority,
         });
         const updated = await loadByIdOn(client, id);
         if (!updated) throw new NotFoundError(id);

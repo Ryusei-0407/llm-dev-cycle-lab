@@ -38,11 +38,12 @@ export type Message = {
 // union keyed by type; the detail view renders each type as a fixed phrase.
 export type TicketEvent = {
   id: string;
-  type: "status_changed" | "assignee_changed" | "labels_changed";
+  type: "status_changed" | "assignee_changed" | "labels_changed" | "priority_changed";
   actorEmail: string;
   payload:
     | { from: TicketStatus; to: TicketStatus }
     | { from: string | null; to: string | null }
-    | { from: string[]; to: string[] };
+    | { from: string[]; to: string[] }
+    | { from: TicketPriority; to: TicketPriority };
   createdAt: string;
 };

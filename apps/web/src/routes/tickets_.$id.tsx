@@ -10,7 +10,7 @@ import { TicketProperties } from "@/components/ticket-properties";
 import { Button } from "@/components/ui/button";
 import { orpc } from "@/lib/orpc";
 import { useSessionUser } from "@/lib/session";
-import type { TicketStatus } from "@/lib/tickets";
+import type { TicketPriority, TicketStatus } from "@/lib/tickets";
 
 // Auth guard mirrors /tickets: resolve the session in beforeLoad and redirect
 // unauthenticated visitors before any detail UI mounts (specs/auth.md).
@@ -72,6 +72,9 @@ function TicketDetailPage() {
 
   const setStatus = useMutation(
     orpc.tickets.setStatus.mutationOptions({ onSuccess: invalidateDetail }),
+  );
+  const setPriority = useMutation(
+    orpc.tickets.setPriority.mutationOptions({ onSuccess: invalidateDetail }),
   );
   const setAssignee = useMutation(
     orpc.tickets.setAssignee.mutationOptions({ onSuccess: invalidateDetail }),
@@ -203,6 +206,7 @@ function TicketDetailPage() {
           agents={agentsQuery.data ?? []}
           labelCatalog={labelsQuery.data ?? []}
           onStatusChange={(status: TicketStatus) => setStatus.mutate({ id, status })}
+          onPriorityChange={(priority: TicketPriority) => setPriority.mutate({ id, priority })}
           onAssigneeChange={(assigneeEmail) => setAssignee.mutate({ id, assigneeEmail })}
           onLabelsChange={(labels) => setLabels.mutate({ id, labels })}
         />
