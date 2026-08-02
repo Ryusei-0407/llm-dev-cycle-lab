@@ -32,6 +32,12 @@ export default defineConfig({
       animations: "disabled" as const,
       caret: "hide" as const,
       maxDiffPixels: 64,
+      // 画素ごとの色距離しきい値。既定 0.2 だとダークテーマの面変化が全て
+      // サブしきい値になり VRT が盲目化する(canvas #010102 vs surface-1
+      // #0a0a0c は YIQ 距離 ≈3.5%、hairline 枠線でも ≈14% — カラムが数百px
+      // 伸びる変化が差分0扱いだった)。同一プラットフォーム(linux CI)の
+      // 描画は決定論的なので、しきい値を落としてもAAノイズは出ない。
+      threshold: 0.02,
     },
   },
   forbidOnly: !!process.env.CI,
