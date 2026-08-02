@@ -129,5 +129,14 @@
     "apps/web/src/components/insight-charts.tsx",
     "apps/web/src/components/app-shell.tsx",
     "e2e/tests/insights.spec.ts"
+  ],
+  "set-priority": [
+    "apps/api/src/tickets/store.ts",
+    "apps/api/src/tickets/router.ts",
+    "apps/api/src/tickets/schema.ts",
+    "apps/api/db/schema.sql",
+    "apps/web/src/components/ticket-properties.tsx",
+    "apps/web/src/components/message-thread.tsx",
+    "e2e/tests/set-priority.spec.ts"
   ]
 }
