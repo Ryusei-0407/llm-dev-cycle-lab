@@ -36,24 +36,52 @@ function messageText(message: ChatMessage): string {
 const SUP_REF = /SUP-\d+/g;
 
 export function CopilotPanel({ onClose }: { onClose: () => void }) {
+  // 会話クリア(spec): useChat の内部状態は connection の差し替えでは消えない
+  // ため、useChat を内包する子コンポーネントを key で再マウントして確実に
+  // 空へ戻す。下書き(draft)はこの外側が持つのでクリアの影響を受けず、
+  // 開閉状態(別ストア)も無関係。
+  const [resetKey, setResetKey] = useState(0);
+  const [draft, setDraft] = useState("");
+
+  return (
+    <section
+      data-testid="copilot-panel"
+      className="fixed right-4 bottom-4 z-40 flex max-h-[70dvh] w-96 flex-col overflow-hidden rounded-lg border border-hairline bg-surface-3 shadow-lg"
+    >
+      <CopilotChat
+        key={resetKey}
+        draft={draft}
+        setDraft={setDraft}
+        onClose={onClose}
+        onClear={() => setResetKey((k) => k + 1)}
+      />
+    </section>
+  );
+}
+
+function CopilotChat({
+  draft,
+  setDraft,
+  onClose,
+  onClear,
+}: {
+  draft: string;
+  setDraft: (value: string) => void;
+  onClose: () => void;
+  onClear: () => void;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  // 会話クリア(spec): connection を作り直すと useChat が新しい ChatClient を張り
-  // 直し、messages が空に戻る。resetKey を進めて useMemo を再評価させる。下書き
-  // (draft)や開閉状態はこの state に紐づかないので影響しない。
-  const [resetKey, setResetKey] = useState(0);
 
   // The server derives everything from the SQL snapshot + the wire messages, so
   // no request body data is needed beyond the conversation useChat sends.
   // credentials "include" carries the session cookie (the route is auth-gated).
   const connection = useMemo(
     () => fetchServerSentEvents("/api/copilot/chat", { credentials: "include" }),
-    [resetKey],
+    [],
   );
   const { messages, sendMessage, isLoading, error } = useChat({ connection });
 
-  const [draft, setDraft] = useState("");
   const isEmpty = messages.length === 0;
 
   const onSubmit = (event: FormEvent) => {
@@ -76,17 +104,14 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <section
-      data-testid="copilot-panel"
-      className="fixed right-4 bottom-4 z-40 flex max-h-[70dvh] w-96 flex-col overflow-hidden rounded-lg border border-hairline bg-surface-3 shadow-lg"
-    >
+    <>
       <div className="flex items-center gap-2 border-b border-hairline px-4 py-3">
         <h2 className="flex-1 text-sm font-semibold text-ink">Copilot</h2>
         {!isEmpty && (
           <button
             type="button"
             data-testid="copilot-clear"
-            onClick={() => setResetKey((k) => k + 1)}
+            onClick={onClear}
             disabled={isLoading}
             className="text-sm text-ink-subtle transition-colors hover:text-ink disabled:opacity-50"
           >
@@ -162,7 +187,7 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
           送信
         </Button>
       </form>
-    </section>
+    </>
   );
 }
 
