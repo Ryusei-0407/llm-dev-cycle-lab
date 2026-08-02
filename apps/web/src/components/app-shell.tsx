@@ -136,6 +136,17 @@ export function AppShell({ user, children }: { user: User; children: React.React
             Board
           </Link>
         )}
+        {/* Insights is agent-only (specs/insights.md), same出し分け as the board;
+            a customer is turned away at /insights by insights-forbidden. */}
+        {isAgent && (
+          <Link
+            data-testid="nav-insights"
+            to="/insights"
+            className="rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground [&.active]:bg-surface-1 [&.active]:text-foreground"
+          >
+            インサイト
+          </Link>
+        )}
         <div className="mt-auto flex flex-col gap-2 px-2">
           {/* copilot launcher (spec: specs/copilot.md), agent-only — directly
               above current-user. Ctrl/⌘+/ toggles the same panel. */}
