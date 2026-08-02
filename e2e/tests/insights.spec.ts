@@ -127,6 +127,17 @@ test.describe("insights view @feature-insights", () => {
         await expect(page.getByTestId("insight-chart-labels")).toContainText("auth");
         await snap(page, testInfo, "ラベルチャート");
       });
+
+      await test.step("取得失敗で insights-error が表示される", async () => {
+        // 仕様 MUST の失敗表示。後から登録した route が優先される — 500 に
+        // 差し替えて再読込(E2E 予算内でエラー経路を同一テストに同居させる)。
+        await page.route("**/api/rpc/tickets/insights", (route) =>
+          route.fulfill({ status: 500, json: { error: "boom" } }),
+        );
+        await page.reload();
+        await expect(page.getByTestId("insights-error")).toBeVisible();
+        await snap(page, testInfo, "取得失敗");
+      });
     },
   );
 

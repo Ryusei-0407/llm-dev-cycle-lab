@@ -265,6 +265,50 @@ test.describe("visual regression @feature-visual @visual", () => {
   );
 
   test(
+    "insights",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "インサイト画面(統計カード4枚 + 推移/ラベルの2チャート)を固定データで baseline と比較",
+      },
+    },
+    async ({ page }) => {
+      await stubTicketData(page);
+      // チャートの軸・形状まで決定的にする(日付も固定)。
+      const resolvedByDay = Array.from({ length: 14 }, (_, i) => ({
+        date: `2026-07-${String(i + 1).padStart(2, "0")}`,
+        count: [0, 1, 0, 2, 1, 0, 3, 1, 2, 0, 1, 4, 2, 1][i],
+      }));
+      await page.route("**/api/rpc/tickets/insights", (route) =>
+        route.fulfill({
+          json: {
+            json: {
+              byStatus: { open: 5, in_progress: 2, resolved: 7 },
+              byPriority: { low: 4, medium: 6, high: 4 },
+              unassigned: 3,
+              byLabel: [
+                { name: "api", color: "#6a8dff", count: 2 },
+                { name: "auth", color: "#e2626b", count: 4 },
+                { name: "billing", color: "#f2c94c", count: 1 },
+                { name: "email", color: "#27a644", count: 0 },
+                { name: "request", color: "#9a6ae2", count: 3 },
+              ],
+              resolvedByDay,
+            },
+          },
+        }),
+      );
+      await test.step("インサイトを開いて撮影する", async () => {
+        await page.goto("/insights");
+        await expect(page.getByTestId("insight-chart-labels")).toBeVisible();
+        await expect(page).toHaveScreenshot("insights.png", { fullPage: true });
+        await attachShot(page, "insights");
+      });
+    },
+  );
+
+  test(
     "kanban board",
     {
       annotation: {
