@@ -239,6 +239,18 @@ export function createTicketsRouter(hub: RealtimeHub) {
       return getStore().inboxCount();
     }),
 
+    // insights dashboard aggregate (spec: specs/insights.md). Agent-only — a
+    // customer is FORBIDDEN, mirroring inboxCount/agents. Session required. now
+    // defaults to the store's new Date(); the deterministic value is exercised
+    // at the store layer, not over the wire.
+    insights: base.handler(({ context }) => {
+      const user = requireUser(context.user);
+      if (user.role !== "agent") {
+        throw new ORPCError("FORBIDDEN", { message: "agent only" });
+      }
+      return getStore().insights();
+    }),
+
     // Ticket detail: the ticket, its thread, and its activity log. Existence →
     // ownership: a missing ticket is NOT_FOUND, a customer's cross-owner access is
     // FORBIDDEN. events is created_at ASC (store contract).

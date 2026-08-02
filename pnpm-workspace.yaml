@@ -6,6 +6,9 @@ allowBuilds:
   "@google/genai": false
   esbuild: true
   protobufjs: false
+minimumReleaseAgeExclude:
+  - "@tanstack/charts@0.5.1"
+  - "@tanstack/react-charts@0.5.1"
 # vite-plus (0.2.x) bundles its own vitest/vite; pnpm's isolated layout splits
 # @vitest/browser onto a second vite instance and breaks browser mode.
 # Hoisted layout restores npm-compatible resolution until upstream supports it.
