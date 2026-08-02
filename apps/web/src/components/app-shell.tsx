@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { User } from "@/auth/api";
 import { logout, registerPasskey } from "@/auth/api";
+import { CommandPalette } from "@/components/command-palette";
 import { Button } from "@/components/ui/button";
 import { orpc } from "@/lib/orpc";
 import { useRealtimeInvalidation } from "@/lib/realtime";
@@ -18,6 +19,22 @@ export function AppShell({ user, children }: { user: User; children: React.React
   const router = useRouter();
   useRealtimeInvalidation();
   const [passkeyState, setPasskeyState] = useState<"idle" | "registered" | "error">("idle");
+
+  // Global ⌘K / Ctrl+K opens the command palette from any authenticated screen
+  // (spec: specs/command-palette.md). The shortcut and open state live here so a
+  // single palette is mounted per shell; preventDefault suppresses the browser's
+  // own find bar. It fires even while an input is focused (spec).
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // Inbox badge count (spec: specs/triage.md). Agent-only: the enabled guard
   // stops a customer session from ever calling the agent-only procedure (which
@@ -48,7 +65,18 @@ export function AppShell({ user, children }: { user: User; children: React.React
         data-testid="app-sidebar"
         className="flex w-60 flex-col gap-1 border-r border-border px-3 py-4"
       >
-        <span className="mb-4 px-2 text-sm font-semibold tracking-tight">サポートデスク</span>
+        <span className="mb-2 px-2 text-sm font-semibold tracking-tight">サポートデスク</span>
+        {/* Palette opener directly under the workspace name (spec: モック01). Shows
+            the same ⌘K hint the shortcut uses; clicking it toggles the palette. */}
+        <button
+          type="button"
+          data-testid="sidebar-search"
+          onClick={() => setPaletteOpen(true)}
+          className="mb-2 flex items-center justify-between rounded-md border border-border px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          検索…
+          <kbd className="rounded bg-surface-2 px-1.5 text-xs text-foreground">⌘K</kbd>
+        </button>
         {/* Inbox is agent-only (specs/triage.md); a customer never sees the link
             and is turned away at /inbox by inbox-forbidden — same出し分け as the
             board. The count badge is hidden while the inbox is empty. */}
@@ -117,6 +145,7 @@ export function AppShell({ user, children }: { user: User; children: React.React
         </div>
       </nav>
       <div className="flex-1 min-w-0 overflow-hidden">{children}</div>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isAgent={isAgent} />
     </div>
   );
 }
