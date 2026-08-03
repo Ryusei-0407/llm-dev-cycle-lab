@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { type DragEvent, useEffect, useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
-import type { Ticket, TicketStatus } from "@/lib/tickets";
+import type { Ticket, TicketPriority, TicketStatus } from "@/lib/tickets";
 import { cn } from "@/lib/utils";
 
 const COLUMNS: { status: TicketStatus; label: string }[] = [
@@ -9,6 +9,99 @@ const COLUMNS: { status: TicketStatus; label: string }[] = [
   { status: "in_progress", label: "In progress" },
   { status: "resolved", label: "Resolved" },
 ];
+
+// APP_DESIGN priority/progress accents that the shipped theme (styles.css) does
+// not expose as CSS variables: literal hex from the design source (mock --high /
+// --warn). Kept here so the glyphs stay faithful without touching the theme.
+const HIGH = "#f0883e";
+const WARN = "#f2c94c";
+
+// Priority as a three-step bar glyph (mock04 .prio, Linear 風): all three bars
+// lit for high in the warn/high hue, two for medium, one for low; unlit bars
+// fall back to surface-4. Colours ride inline styles because --surface-4 has no
+// Tailwind utility and --high is not a theme token.
+const PRIORITY_BARS: Record<TicketPriority, { lit: number; color: string }> = {
+  low: { lit: 1, color: "var(--ink-tertiary)" },
+  medium: { lit: 2, color: "var(--ink-tertiary)" },
+  high: { lit: 3, color: HIGH },
+};
+
+function PriorityBars({ priority }: { priority: TicketPriority }) {
+  const { lit, color } = PRIORITY_BARS[priority];
+  const heights = [4, 7, 10];
+  return (
+    <span aria-hidden className="inline-flex items-end gap-px" style={{ height: 10 }}>
+      {heights.map((h, i) => (
+        <span
+          key={h}
+          className="w-[3px] rounded-[1px]"
+          style={{ height: h, background: i < lit ? color : "var(--surface-4)" }}
+        />
+      ))}
+    </span>
+  );
+}
+
+// Column status glyph (mock04 .col-h .st): a hollow ring for open, a warn
+// half-filled ring for in-progress, a filled success ring for resolved. Purely
+// decorative — the accessible column name stays the heading text.
+function ColumnStatusIcon({ status }: { status: TicketStatus }) {
+  const base = "inline-block size-3.5 rounded-full";
+  if (status === "resolved") {
+    return <span aria-hidden className={base} style={{ background: "var(--success)" }} />;
+  }
+  if (status === "in_progress") {
+    // warn ring with a half-filled core (mock04 .st.prog conic-gradient).
+    return (
+      <span
+        aria-hidden
+        className="relative inline-block size-3.5 rounded-full"
+        style={{ border: `1.5px solid ${WARN}` }}
+      >
+        <span
+          className="absolute inset-0.5 rounded-full"
+          style={{ background: `conic-gradient(${WARN} 0 50%, transparent 50% 100%)` }}
+        />
+      </span>
+    );
+  }
+  return <span aria-hidden className={base} style={{ border: "1.5px solid var(--ink-subtle)" }} />;
+}
+
+// Assignee initials disc (mock04 .avatar): the two-letter monogram of the
+// assignee's local part, or a dashed en-dash disc when unassigned. Decorative —
+// the card's accessible content stays the subject Link / status / priority.
+function assigneeInitials(email: string | null): string | null {
+  if (!email) return null;
+  const local = email.slice(0, email.indexOf("@") > 0 ? email.indexOf("@") : undefined);
+  const parts = local.split(/[.\-_]/).filter(Boolean);
+  const letters = (parts.length >= 2 ? parts[0][0] + parts[1][0] : local.slice(0, 2)) ?? "";
+  return letters.toUpperCase();
+}
+
+function AssigneeDisc({ email }: { email: string | null }) {
+  const initials = assigneeInitials(email);
+  if (!initials) {
+    return (
+      <span
+        aria-hidden
+        className="grid size-[18px] shrink-0 place-items-center rounded-full text-[9px] text-ink-tertiary"
+        style={{ border: "1px dashed var(--hairline-strong)" }}
+      >
+        –
+      </span>
+    );
+  }
+  return (
+    <span
+      aria-hidden
+      className="grid size-[18px] shrink-0 place-items-center rounded-full bg-surface-3 text-[9px] font-semibold text-ink-muted"
+      style={{ border: "1px solid var(--hairline-strong)" }}
+    >
+      {initials}
+    </span>
+  );
+}
 
 // The ticket id travels through the browser's own drag channel as text/plain, so
 // dragstart writes it and drop reads it — the same DataTransfer instance the BM
@@ -104,11 +197,12 @@ export function KanbanBoard({
               onDrop={(e) => onDrop(e, column.status)}
               className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 p-3"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 px-0.5">
+                <ColumnStatusIcon status={column.status} />
                 <h2 className="text-sm font-medium tracking-tight">{column.label}</h2>
                 <span
                   data-testid="column-count"
-                  className="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-muted"
+                  className="ml-auto inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-muted"
                 >
                   {cards.length}
                 </span>
@@ -131,6 +225,9 @@ export function KanbanBoard({
 // リフト」). The subject is a router Link in the TicketList idiom.
 function KanbanCard({ ticket }: { ticket: Ticket }) {
   const [dragging, setDragging] = useState(false);
+  // Mock04 shows one leading label chip (outline pill + colour dot); the row
+  // idiom keeps the rest off the card to hold its density.
+  const label = ticket.labels?.[0];
 
   return (
     <div
@@ -143,10 +240,15 @@ function KanbanCard({ ticket }: { ticket: Ticket }) {
       }}
       onDragEnd={() => setDragging(false)}
       className={cn(
-        "flex flex-col gap-2 rounded-lg border border-hairline bg-surface-1 p-3",
+        "flex flex-col gap-1.5 rounded-lg border border-hairline bg-surface-1 p-3",
         dragging && "bg-surface-2",
       )}
     >
+      {ticket.number != null && (
+        <span data-testid="card-number" className="font-mono text-[10.5px] text-ink-tertiary">
+          SUP-{ticket.number}
+        </span>
+      )}
       <Link
         to="/tickets/$id"
         params={{ id: ticket.id }}
@@ -155,8 +257,21 @@ function KanbanCard({ ticket }: { ticket: Ticket }) {
         {ticket.subject}
       </Link>
       <div className="flex items-center gap-2">
-        <StatusBadge status={ticket.status} />
+        <PriorityBars priority={ticket.priority} />
         <span className="text-xs text-ink-subtle capitalize">{ticket.priority}</span>
+        <StatusBadge status={ticket.status} />
+        {label && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-hairline px-1.5 text-[11px] text-ink-subtle">
+            <span
+              className="size-[7px] shrink-0 rounded-full"
+              style={{ background: label.color }}
+            />
+            {label.name}
+          </span>
+        )}
+        <span className="ml-auto">
+          <AssigneeDisc email={ticket.assigneeEmail ?? null} />
+        </span>
       </div>
     </div>
   );
