@@ -11,6 +11,7 @@ import {
   searchInput,
   setAssigneeInput,
   setLabelsInput,
+  setPriorityInput,
   setStatusInput,
 } from "./schema.js";
 import { BadRequestError, createTicketStore, NotFoundError, type TicketStore } from "./store.js";
@@ -167,6 +168,17 @@ export function createTicketsRouter(hub: RealtimeHub) {
       const user = requireUser(context.user);
       return agentMutation(context.user, input.id, () =>
         getStore().setStatus(input.id, input.status, user.email),
+      );
+    }),
+
+    // setPriority is agent-only: a customer is FORBIDDEN even for their own
+    // ticket (spec: specs/set-priority.md). Session required. A same-value change
+    // is a no-op in the store (no event, no updated_at bump) and does not
+    // broadcast — detected by comparing updatedAt before/after in agentMutation.
+    setPriority: base.input(setPriorityInput).handler(({ input, context }) => {
+      const user = requireUser(context.user);
+      return agentMutation(context.user, input.id, () =>
+        getStore().setPriority(input.id, input.priority, user.email),
       );
     }),
 

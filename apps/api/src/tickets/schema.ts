@@ -13,6 +13,14 @@ export const setStatusInput = z.object({
   status: statusSchema,
 });
 
+// set-priority (spec: specs/set-priority.md). A ticket id plus the target
+// priority enum; both reject at this boundary (uuid 検証は get/setAssignee 系の
+// 現行規約に合わせる — setStatus の素の string は旧規約)。
+export const setPriorityInput = z.object({
+  id: z.string().uuid(),
+  priority: prioritySchema,
+});
+
 // ticket-detail (spec: specs/ticket-detail.md サーバー契約). get takes a ticket
 // id; reply takes the target ticket + the message body (author is session-
 // derived, never part of the input).
@@ -64,6 +72,7 @@ export const searchInput = z.object({
 
 export type CreateInput = z.infer<typeof createInput>;
 export type SetStatusInput = z.infer<typeof setStatusInput>;
+export type SetPriorityInput = z.infer<typeof setPriorityInput>;
 export type GetInput = z.infer<typeof getInput>;
 export type ReplyInput = z.infer<typeof replyInput>;
 export type SetAssigneeInput = z.infer<typeof setAssigneeInput>;

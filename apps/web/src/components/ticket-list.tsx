@@ -4,6 +4,12 @@ import { useEffect, useRef } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import type { Ticket, TicketStatus } from "@/lib/tickets";
 
+const PRIORITY_LABELS: Record<Ticket["priority"], string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
 const STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [
   { value: "open", label: "Open" },
   { value: "in_progress", label: "In progress" },
@@ -138,7 +144,9 @@ export function TicketList({
               <span>
                 <StatusBadge status={ticket.status} />
               </span>
-              <span className="text-xs text-ink-subtle capitalize">{ticket.priority}</span>
+              {/* CSS capitalize だと DOM テキストは生値のまま。表示・支援技術・
+                  テキストアンカーが一致するようラベル表記を実テキストで出す。 */}
+              <span className="text-xs text-ink-subtle">{PRIORITY_LABELS[ticket.priority]}</span>
               {showStatusControl ? (
                 <select
                   data-testid="ticket-status-select"

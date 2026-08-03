@@ -105,7 +105,7 @@ CREATE TABLE ticket_events (
   id uuid PRIMARY KEY DEFAULT uuidv7(),
   ticket_id uuid NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
   actor_email text NOT NULL,
-  type text NOT NULL CHECK (type IN ('status_changed', 'assignee_changed', 'labels_changed')),
+  type text NOT NULL CHECK (type IN ('status_changed', 'assignee_changed', 'labels_changed', 'priority_changed')),
   payload jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
