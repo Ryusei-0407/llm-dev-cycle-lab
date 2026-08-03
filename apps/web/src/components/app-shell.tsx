@@ -80,74 +80,103 @@ export function AppShell({ user, children }: { user: User; children: React.React
     setPasskeyState((await registerPasskey()) ? "registered" : "error");
   };
 
+  // Nav row shape shared by every sidebar link (spec: モック01). Icons are inline
+  // and aria-hidden so they never leak into the accessible name the e2e aria
+  // snapshots pin (受信トレイ / Tickets / Board). active lifts to surface-2.
+  const navItemClass =
+    "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground [&.active]:bg-surface-2 [&.active]:text-foreground";
+
   return (
     <div className="flex h-dvh">
       <nav
         data-testid="app-sidebar"
-        className="flex w-60 flex-col gap-1 border-r border-border px-3 py-4"
+        className="flex w-60 flex-col gap-0.5 border-r border-border px-2 py-3"
       >
-        <span className="mb-2 px-2 text-sm font-semibold tracking-tight">サポートデスク</span>
+        <div className="mb-2 flex items-center gap-2 px-2 py-1.5 text-sm font-semibold">
+          <span
+            aria-hidden="true"
+            className="grid size-[18px] place-items-center rounded-[5px] bg-[var(--brand)] text-[10px] font-bold text-white"
+          >
+            S
+          </span>
+          サポートデスク
+        </div>
         {/* Palette opener directly under the workspace name (spec: モック01). Shows
             the same ⌘K hint the shortcut uses; clicking it toggles the palette. */}
         <button
           type="button"
           data-testid="sidebar-search"
           onClick={() => setPaletteOpen(true)}
-          className="mb-2 flex items-center justify-between rounded-md border border-border px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="mb-2 flex items-center justify-between rounded-md border border-border bg-surface-2 px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           検索…
-          <kbd className="rounded bg-surface-2 px-1.5 text-xs text-foreground">⌘K</kbd>
+          <kbd className="rounded border border-input bg-surface-3 px-1.5 text-xs">⌘K</kbd>
         </button>
         {/* Inbox is agent-only (specs/triage.md); a customer never sees the link
             and is turned away at /inbox by inbox-forbidden — same出し分け as the
             board. The count badge is hidden while the inbox is empty. */}
         {isAgent && (
-          <Link
-            data-testid="nav-inbox"
-            to="/inbox"
-            className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground [&.active]:bg-surface-1 [&.active]:text-foreground"
-          >
+          <Link data-testid="nav-inbox" to="/inbox" className={navItemClass}>
+            <InboxIcon />
             受信トレイ
             {inboxCount > 0 && (
               <span
                 data-testid="inbox-count"
-                className="rounded-full bg-surface-2 px-1.5 text-xs tabular-nums text-foreground"
+                className="ml-auto rounded-full bg-[var(--brand)] px-1.5 text-xs font-semibold tabular-nums text-white"
               >
                 {inboxCount}
               </span>
             )}
           </Link>
         )}
-        <Link
-          data-testid="nav-tickets"
-          to="/tickets"
-          className="rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground [&.active]:bg-surface-1 [&.active]:text-foreground"
-        >
+        <Link data-testid="nav-tickets" to="/tickets" className={navItemClass}>
+          <ListIcon />
           Tickets
         </Link>
         {/* The board is an agent-only view (specs/kanban.md); a customer never
             sees the link and is turned away at /board by board-forbidden. */}
         {user.role === "agent" && (
-          <Link
-            data-testid="nav-board"
-            to="/board"
-            className="rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground [&.active]:bg-surface-1 [&.active]:text-foreground"
-          >
+          <Link data-testid="nav-board" to="/board" className={navItemClass}>
+            <BoardIcon />
             Board
           </Link>
         )}
         {/* Insights is agent-only (specs/insights.md), same出し分け as the board;
             a customer is turned away at /insights by insights-forbidden. */}
         {isAgent && (
-          <Link
-            data-testid="nav-insights"
-            to="/insights"
-            className="rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground [&.active]:bg-surface-1 [&.active]:text-foreground"
-          >
+          <Link data-testid="nav-insights" to="/insights" className={navItemClass}>
+            <ChartIcon />
             インサイト
           </Link>
         )}
-        <div className="mt-auto flex flex-col gap-2 px-2">
+        {/* View presets (spec: モック01 ビュー節): plain Links that ride the
+            existing /tickets URL filters — no new state, just a starting query. */}
+        {isAgent && (
+          <>
+            <div className="px-2 pt-3.5 pb-1 text-[11px] tracking-wide text-ink-tertiary">
+              ビュー
+            </div>
+            <Link
+              data-testid="sidebar-view-high"
+              to="/tickets"
+              search={{ priority: "high" }}
+              className={navItemClass}
+            >
+              <span aria-hidden="true" className="size-[7px] rounded-full bg-[#f0883e]" />
+              高優先度
+            </Link>
+            <Link
+              data-testid="sidebar-view-open"
+              to="/tickets"
+              search={{ status: "open" }}
+              className={navItemClass}
+            >
+              <span aria-hidden="true" className="size-[7px] rounded-full bg-[#f2c94c]" />
+              未対応のみ
+            </Link>
+          </>
+        )}
+        <div className="mt-auto flex flex-col gap-2 px-1 pt-2">
           {/* copilot launcher (spec: specs/copilot.md), agent-only — directly
               above current-user. Ctrl/⌘+/ toggles the same panel. */}
           {isAgent && (
@@ -155,10 +184,13 @@ export function AppShell({ user, children }: { user: User; children: React.React
               type="button"
               data-testid="copilot-launch"
               onClick={() => setCopilotOpen(true)}
-              className="flex items-center justify-between rounded-md border border-border px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              className="flex items-center gap-2 rounded-lg border border-border bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface-1)] px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
+              <span aria-hidden="true" className="size-2 rounded-full bg-[var(--brand-hover)]" />
               Copilot に質問…
-              <kbd className="rounded bg-surface-2 px-1.5 text-xs text-foreground">⌘/</kbd>
+              <kbd className="ml-auto rounded border border-input bg-surface-3 px-1.5 text-xs">
+                ⌘/
+              </kbd>
             </button>
           )}
           <span data-testid="current-user" className="text-sm text-muted-foreground">
@@ -193,5 +225,53 @@ export function AppShell({ user, children }: { user: User; children: React.React
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isAgent={isAgent} />
       {isAgent && copilotOpen && <CopilotPanel onClose={() => setCopilotOpen(false)} />}
     </div>
+  );
+}
+
+// Nav glyphs traced from モック01 (inbox waveform / list / board bars / chart).
+// aria-hidden via the shared props so the accessible name stays the link text.
+const iconProps = {
+  width: 14,
+  height: 14,
+  viewBox: "0 0 16 16",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.3,
+  "aria-hidden": true,
+  className: "shrink-0",
+} as const;
+
+function InboxIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M2 8h3l1.5 3 3-6L11 8h3" />
+      <rect x="1.5" y="2.5" width="13" height="11" rx="2.5" />
+    </svg>
+  );
+}
+
+function ListIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />
+    </svg>
+  );
+}
+
+function BoardIcon() {
+  return (
+    <svg {...iconProps}>
+      <rect x="2" y="3" width="3.4" height="10" rx="1" />
+      <rect x="6.3" y="3" width="3.4" height="7" rx="1" />
+      <rect x="10.6" y="3" width="3.4" height="4.5" rx="1" />
+    </svg>
+  );
+}
+
+function ChartIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M2.5 13V8.5m5 4.5V5.5m5 7.5V3" />
+    </svg>
   );
 }
