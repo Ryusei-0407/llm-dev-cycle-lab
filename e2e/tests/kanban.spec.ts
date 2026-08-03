@@ -20,6 +20,40 @@ test.describe("kanban board @feature-kanban", () => {
   const ownSubject = (testInfo: { testId: string; retry: number }) =>
     `Kanban smoke ${testInfo.testId} r${testInfo.retry}: elevator music too loud`;
 
+  // Drags a card (matched by subject) onto a status column, dropping at the
+  // SAME y as the source card (target column's x centre) instead of the target
+  // element's centre. Playwright scrolls the drop point into view AFTER
+  // mousedown; if that scroll happens, the page slides under the held pointer
+  // and the drag begins on whichever card lands there (掴み違い — 隣のカードが
+  // 移動して自分のカードは残る). With columns taller than the viewport the
+  // element centre can sit off-screen (and with the source card pushed below
+  // the fold by parallel tests' tickets, even the column top can) — but the
+  // columns are equal-height siblings (auto-rows-fr), so the point sharing the
+  // source card's y is always inside the target column AND already visible
+  // once the source has been scrolled into view. Element-relative coordinates
+  // make it scroll-invariant; drops on whatever renders there bubble to the
+  // column li, which owns the drop handler.
+  async function dragCardToColumn(
+    page: import("@playwright/test").Page,
+    subject: string,
+    status: "open" | "in_progress" | "resolved",
+  ) {
+    const card = page
+      .getByTestId("kanban-column-open")
+      .getByTestId("kanban-card")
+      .filter({ hasText: subject });
+    const column = page.getByTestId(`kanban-column-${status}`);
+    const cardBox = await card.boundingBox();
+    const colBox = await column.boundingBox();
+    if (!cardBox || !colBox) throw new Error("bounding box unavailable");
+    await card.dragTo(column, {
+      targetPosition: {
+        x: colBox.width / 2,
+        y: cardBox.y - colBox.y + cardBox.height / 2,
+      },
+    });
+  }
+
   // Creates a ticket over the oRPC wire under the current (agent) session and
   // returns its id. oRPC RPCHandler wire: POST /api/rpc/tickets/create, body
   // {"json": input}, success body {"json": {id, ...}} (json 封筒を吸収する)。
@@ -88,10 +122,7 @@ test.describe("kanban board @feature-kanban", () => {
       });
 
       await test.step("カードを In progress 列へドラッグする", async () => {
-        await page.dragAndDrop(
-          `[data-testid="kanban-column-open"] [data-testid="kanban-card"]:has-text("${subject}")`,
-          `[data-testid="kanban-column-in_progress"]`,
-        );
+        await dragCardToColumn(page, subject, "in_progress");
         // 列移動が確定する: 対象カードが in_progress 列に現れ、open 列からは消える。
         await expect(
           targetColumn.getByTestId("kanban-card").filter({ hasText: subject }),
@@ -119,6 +150,98 @@ test.describe("kanban board @feature-kanban", () => {
         - listitem
         - listitem
     `);
+    },
+  );
+
+  test(
+    "列がビューポートを縦に超える高さでも自分のカードだけが移動する @pinned",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "反例の固定: 列がビューポートより高いと page.dragAndDrop が mousedown 後に対象列を scrollIntoView し、保持中のポインタ直下へ別のカードがスライドして掴み違いが起きる(自分のカードが動かず隣のカードが移動)。列を確実に画面外まで伸ばした状態でドラッグし、自分のカードだけが In progress へ移ることを検証",
+      },
+    },
+    async ({ page }, testInfo) => {
+      // モックレーン: 共有DBに filler を書くと一覧系テストのアンカー行が仮想
+      // リストの可視窓から押し出されて波及するため、この反例の幾何(自分の
+      // カードがビューポート外に沈むほど高い Open 列)は page.route の固定
+      // データで作る(visual.spec.ts と同じ隔離)。newest first のリスト順で
+      // filler 7枚の下に自分のカードを置く。
+      const subject = "Kanban pin: own card starts below the fold";
+      const ownId = "00000000-0000-7000-8000-00000000dd00";
+      const ticket = (i: number, id: string, subj: string) => ({
+        id,
+        number: i,
+        subject: subj,
+        status: "open",
+        priority: "medium",
+        requesterEmail: "casey@example.com",
+        assigneeEmail: null,
+        labels: [],
+        createdAt: "2026-07-01T09:00:00.000Z",
+        updatedAt: "2026-07-01T09:00:00.000Z",
+      });
+      const tickets = [
+        ...Array.from({ length: 7 }, (_, i) =>
+          ticket(
+            9 - i,
+            `00000000-0000-7000-8000-00000000dd0${i + 1}`,
+            `Kanban pin filler #${i + 1}`,
+          ),
+        ),
+        ticket(1, ownId, subject),
+      ];
+      // 掴み違いのワイヤレベル検出: drop が setStatus に載せた id を捕捉する。
+      const movedIds: string[] = [];
+
+      await test.step("固定データを配線してボードを開く", async () => {
+        await page.route("**/api/rpc/tickets/list", (route) =>
+          route.fulfill({ json: { json: tickets } }),
+        );
+        await page.route("**/api/rpc/tickets/setStatus", (route) => {
+          const body = route.request().postDataJSON() as {
+            json: { id: string; status: string };
+          };
+          movedIds.push(body.json.id);
+          return route.fulfill({ json: { json: { ...tickets[7], status: body.json.status } } });
+        });
+        await page.goto("/board");
+      });
+
+      await test.step("自分のカードが初期ビューポート外にあることを確認する", async () => {
+        const ownCard = page
+          .getByTestId("kanban-column-open")
+          .getByTestId("kanban-card")
+          .filter({ hasText: subject });
+        // attached はしているが初期スクロール位置では見えない、が前提。
+        // 前提の固定: 満たさない場合はテスト自体を失敗させ、空虚に通ることを防ぐ。
+        await expect(ownCard).toBeAttached();
+        const cardBox = await ownCard.boundingBox();
+        const viewport = page.viewportSize();
+        if (!cardBox || !viewport) throw new Error("bounding box unavailable");
+        expect(cardBox.y + cardBox.height).toBeGreaterThan(viewport.height);
+      });
+
+      await test.step("自分のカードを In progress 列へドラッグする", async () => {
+        await dragCardToColumn(page, subject, "in_progress");
+        await expect(
+          page
+            .getByTestId("kanban-column-in_progress")
+            .getByTestId("kanban-card")
+            .filter({ hasText: subject }),
+        ).toBeVisible();
+        // 掴み違いの検出: setStatus が自分のカードの id で 1 回だけ呼ばれ、
+        // filler は 1 枚も Open 列から動いていない。
+        expect(movedIds).toEqual([ownId]);
+        await expect(
+          page
+            .getByTestId("kanban-column-open")
+            .getByTestId("kanban-card")
+            .filter({ hasText: "Kanban pin filler" }),
+        ).toHaveCount(7);
+        await snap(page, testInfo, "ドラッグ後");
+      });
     },
   );
 
@@ -216,10 +339,7 @@ test.describe("kanban board @feature-kanban", () => {
       });
 
       await test.step("カードをドラッグしてエラー表示とカードが動かないことを確認する", async () => {
-        await page.dragAndDrop(
-          `[data-testid="kanban-column-open"] [data-testid="kanban-card"]:has-text("${subject}")`,
-          `[data-testid="kanban-column-in_progress"]`,
-        );
+        await dragCardToColumn(page, subject, "in_progress");
         await expect(page.getByTestId("board-error")).toBeVisible();
         // 失敗時はカードが元の open 列に残り、in_progress へは移らない。
         await expect(openCard).toBeVisible();
