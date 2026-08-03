@@ -46,7 +46,7 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
   return (
     <section
       data-testid="copilot-panel"
-      className="fixed right-4 bottom-4 z-40 flex max-h-[70dvh] w-96 flex-col overflow-hidden rounded-lg border border-hairline bg-surface-3 shadow-lg"
+      className="fixed right-4 bottom-4 z-40 flex max-h-[70dvh] w-96 flex-col overflow-hidden rounded-xl border border-input bg-surface-3 shadow-[0_16px_48px_rgb(0_0_0/0.6)]"
     >
       <CopilotChat
         key={resetKey}
@@ -106,6 +106,7 @@ function CopilotChat({
   return (
     <>
       <div className="flex items-center gap-2 border-b border-hairline px-4 py-3">
+        <span aria-hidden className="size-2 rounded-full bg-[var(--brand-hover)]" />
         <h2 className="flex-1 text-sm font-semibold text-ink">Copilot</h2>
         {!isEmpty && (
           <button
@@ -152,7 +153,7 @@ function CopilotChat({
             <p
               key={message.id}
               data-testid="copilot-user"
-              className="self-end rounded-lg bg-surface-1 px-3 py-2 text-sm text-ink"
+              className="max-w-[85%] self-end rounded-lg rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground"
             >
               {messageText(message)}
             </p>
@@ -160,7 +161,7 @@ function CopilotChat({
             <p
               key={message.id}
               data-testid="copilot-assistant"
-              className="rounded-lg px-3 py-2 text-sm whitespace-pre-wrap text-ink"
+              className="max-w-[92%] self-start rounded-lg rounded-bl-sm border border-hairline bg-surface-2 px-3 py-2 text-sm whitespace-pre-wrap text-ink-muted"
             >
               <AssistantText text={messageText(message)} onRefClick={goToRef} />
             </p>
@@ -182,6 +183,7 @@ function CopilotChat({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="チケットについて質問…"
+          className="bg-surface-2"
         />
         <Button type="submit" data-testid="copilot-send" disabled={!draft.trim()}>
           送信
@@ -209,7 +211,7 @@ function AssistantText({ text, onRefClick }: { text: string; onRefClick: (ref: s
         type="button"
         data-testid="copilot-ref"
         onClick={() => onRefClick(ref)}
-        className="text-accent underline underline-offset-2"
+        className="font-mono text-[var(--brand-hover)] underline underline-offset-2"
       >
         {ref}
       </button>,
