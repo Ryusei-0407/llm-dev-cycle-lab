@@ -400,7 +400,23 @@ function publishMedia() {
       break;
     } catch (err) {
       if (attempt >= 5) throw err;
-      sh("git", ["pull", "-q", "--rebase", "origin", MEDIA_BRANCH], { cwd: work });
+      // rebase はコミットを作り直すため committer identity が必須(無いと
+      // "Committer identity unknown" で 128 落ちする — CI で実害)。
+      sh(
+        "git",
+        [
+          "-c",
+          "user.name=github-actions[bot]",
+          "-c",
+          "user.email=41898282+github-actions[bot]@users.noreply.github.com",
+          "pull",
+          "-q",
+          "--rebase",
+          "origin",
+          MEDIA_BRANCH,
+        ],
+        { cwd: work },
+      );
     }
   }
   rmSync(work, { recursive: true, force: true });
