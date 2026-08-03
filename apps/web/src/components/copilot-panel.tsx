@@ -16,6 +16,13 @@ import { orpc } from "@/lib/orpc";
 // appends deltas into these parts as the stream arrives).
 type ChatMessage = ReturnType<typeof useChat>["messages"][number];
 
+// 会話が空のときに出す定型質問チップ(spec: 文言完全一致でテスト可能に固定)。
+const SUGGESTIONS = [
+  "全体のチケットの進行状況は?",
+  "未割り当てのチケットはある?",
+  "停滞しているチケットは?",
+];
+
 function messageText(message: ChatMessage): string {
   return message.parts
     .filter((p): p is { type: "text"; content: string } => p.type === "text")
@@ -29,6 +36,40 @@ function messageText(message: ChatMessage): string {
 const SUP_REF = /SUP-\d+/g;
 
 export function CopilotPanel({ onClose }: { onClose: () => void }) {
+  // 会話クリア(spec): useChat の内部状態は connection の差し替えでは消えない
+  // ため、useChat を内包する子コンポーネントを key で再マウントして確実に
+  // 空へ戻す。下書き(draft)はこの外側が持つのでクリアの影響を受けず、
+  // 開閉状態(別ストア)も無関係。
+  const [resetKey, setResetKey] = useState(0);
+  const [draft, setDraft] = useState("");
+
+  return (
+    <section
+      data-testid="copilot-panel"
+      className="fixed right-4 bottom-4 z-40 flex max-h-[70dvh] w-96 flex-col overflow-hidden rounded-lg border border-hairline bg-surface-3 shadow-lg"
+    >
+      <CopilotChat
+        key={resetKey}
+        draft={draft}
+        setDraft={setDraft}
+        onClose={onClose}
+        onClear={() => setResetKey((k) => k + 1)}
+      />
+    </section>
+  );
+}
+
+function CopilotChat({
+  draft,
+  setDraft,
+  onClose,
+  onClear,
+}: {
+  draft: string;
+  setDraft: (value: string) => void;
+  onClose: () => void;
+  onClear: () => void;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -39,9 +80,9 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
     () => fetchServerSentEvents("/api/copilot/chat", { credentials: "include" }),
     [],
   );
-  const { messages, sendMessage, error } = useChat({ connection });
+  const { messages, sendMessage, isLoading, error } = useChat({ connection });
 
-  const [draft, setDraft] = useState("");
+  const isEmpty = messages.length === 0;
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -63,12 +104,20 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <section
-      data-testid="copilot-panel"
-      className="fixed right-4 bottom-4 z-40 flex max-h-[70dvh] w-96 flex-col overflow-hidden rounded-lg border border-hairline bg-surface-3 shadow-lg"
-    >
+    <>
       <div className="flex items-center gap-2 border-b border-hairline px-4 py-3">
         <h2 className="flex-1 text-sm font-semibold text-ink">Copilot</h2>
+        {!isEmpty && (
+          <button
+            type="button"
+            data-testid="copilot-clear"
+            onClick={onClear}
+            disabled={isLoading}
+            className="text-sm text-ink-subtle transition-colors hover:text-ink disabled:opacity-50"
+          >
+            クリア
+          </button>
+        )}
         <button
           type="button"
           data-testid="copilot-close"
@@ -80,6 +129,24 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-3">
+        {isEmpty && (
+          <div className="flex flex-col gap-2">
+            <p data-testid="copilot-suggest-heading" className="text-xs text-ink-subtle">
+              よくある質問
+            </p>
+            {SUGGESTIONS.map((text) => (
+              <button
+                key={text}
+                type="button"
+                data-testid="copilot-suggestion"
+                onClick={() => void sendMessage(text)}
+                className="self-start rounded-lg border border-hairline px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-1"
+              >
+                {text}
+              </button>
+            ))}
+          </div>
+        )}
         {messages.map((message) =>
           message.role === "user" ? (
             <p
@@ -120,7 +187,7 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
           送信
         </Button>
       </form>
-    </section>
+    </>
   );
 }
 
