@@ -178,10 +178,9 @@ export function TicketList({
                   </span>
                 ))}
               </span>
-              <span
-                data-testid="ticket-assignee"
-                className="flex items-center gap-1.5 truncate text-xs text-ink-subtle"
-              >
+              {/* イニシャル円は ticket-assignee の外に置く — testid 内に入れると
+                  toHaveText("agent") のテキストアンカーが "AGagent" に壊れる。 */}
+              <span className="flex items-center gap-1.5 truncate text-xs text-ink-subtle">
                 {ticket.assigneeEmail ? (
                   <span
                     aria-hidden
@@ -190,7 +189,9 @@ export function TicketList({
                     {assigneeInitials(ticket.assigneeEmail)}
                   </span>
                 ) : null}
-                {assigneeLabel(ticket.assigneeEmail ?? null)}
+                <span data-testid="ticket-assignee" className="truncate">
+                  {assigneeLabel(ticket.assigneeEmail ?? null)}
+                </span>
               </span>
               <span>
                 <StatusBadge status={ticket.status} />
