@@ -77,8 +77,9 @@ export function MessageThread({
             <li
               key={item.id}
               data-testid="ticket-event"
-              className="self-center text-xs text-ink-subtle"
+              className="flex items-center gap-2 pl-1 text-xs text-ink-tertiary"
             >
+              <span className="size-2 rounded-full border border-ink-tertiary" aria-hidden="true" />
               {eventText(item.event)}
             </li>
           );
@@ -94,7 +95,9 @@ export function MessageThread({
               )}
             >
               <div className="mb-0.5 flex items-baseline justify-between gap-2 text-xs text-ink-subtle">
-                <span data-testid="message-author">{message.authorEmail}</span>
+                <span data-testid="message-author" className="font-semibold text-ink-muted">
+                  {message.authorEmail}
+                </span>
                 <time className="tabular-nums text-ink-tertiary" dateTime={message.createdAt}>
                   {formatTime(message.createdAt)}
                 </time>

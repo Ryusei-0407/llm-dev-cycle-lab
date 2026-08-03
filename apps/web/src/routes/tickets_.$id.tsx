@@ -175,7 +175,7 @@ function TicketDetailPage() {
 
           <form
             onSubmit={onSubmit}
-            className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 p-4"
+            className="flex flex-col gap-3 rounded-lg border border-(--hairline-strong) bg-surface-1 p-4"
           >
             <textarea
               aria-label="Reply"
@@ -183,7 +183,7 @@ function TicketDetailPage() {
               onChange={(e) => setBody(e.target.value)}
               rows={3}
               placeholder="Write a reply…"
-              className="resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-ink-tertiary outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
             {replyError && (
               <p data-testid="reply-error" role="alert" className="text-sm text-destructive">
