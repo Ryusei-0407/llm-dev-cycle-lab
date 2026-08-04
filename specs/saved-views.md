@@ -97,13 +97,13 @@ body: {"json":{"name":"高優先度の未対応","filters":{"status":"open","pri
 - **E2E 失敗2**:
   1. 空名のまま確定 → view-error 表示、viewsCreate は呼ばれない
   2. customer セッション: サイドバーにビュー節が無い(sidebar-user-view が 0 件)
-     + `request` で viewsCreate 直 POST → FORBIDDEN(403 相当のエラー封筒)
+     - `request` で viewsCreate 直 POST → FORBIDDEN(403 相当のエラー封筒)
 - 最終状態に aria snapshot 1枚(サイドバーの nav 構造: role と順序のみ)
 - タグ: `@feature-saved-views`。feature-map.json に登録:
   `"saved-views": ["apps/api/src/tickets/store.ts", "apps/api/src/tickets/router.ts",
-  "apps/api/src/tickets/schema.ts", "apps/api/db/schema.sql",
-  "apps/web/src/components/app-shell.tsx", "apps/web/src/routes/tickets.tsx",
-  "e2e/tests/saved-views.spec.ts"]`
+"apps/api/src/tickets/schema.ts", "apps/api/db/schema.sql",
+"apps/web/src/components/app-shell.tsx", "apps/web/src/routes/tickets.tsx",
+"e2e/tests/saved-views.spec.ts"]`
 
 ## 実装メモ(制約)
 

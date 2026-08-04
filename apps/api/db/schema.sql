@@ -9,6 +9,7 @@
 DROP TABLE IF EXISTS passkeys;
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS user_views;
 DROP TABLE IF EXISTS ticket_events;
 DROP TABLE IF EXISTS ticket_labels;
 DROP TABLE IF EXISTS labels;
@@ -108,4 +109,18 @@ CREATE TABLE ticket_events (
   type text NOT NULL CHECK (type IN ('status_changed', 'assignee_changed', 'labels_changed', 'priority_changed')),
   payload jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- saved-views (spec: specs/saved-views.md). A named filter combination an agent
+-- saves for their own /tickets; scoped by user_email (no FK — the owner is the
+-- session email, matching requester_email/assignee_email's plain-text style).
+-- filters is the wire SavedViewFilters jsonb stored verbatim; UNIQUE
+-- (user_email, name) makes a same-name save a CONFLICT the router maps.
+CREATE TABLE user_views (
+  id uuid PRIMARY KEY DEFAULT uuidv7(),
+  user_email text NOT NULL,
+  name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 32),
+  filters jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_email, name)
 );

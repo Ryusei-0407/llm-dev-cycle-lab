@@ -70,6 +70,36 @@ export const searchInput = z.object({
   q: z.string().trim().min(1).max(100),
 });
 
+// saved-views (spec: specs/saved-views.md). filters carries the same 3 optional
+// keys the /tickets URL uses (status/priority/label), strict so an unknown key
+// rejects, with .refine enforcing at least one key present (an all-empty view is
+// meaningless). label reuses the 1..32 bound the catalogue names share.
+export const savedViewFilters = z
+  .object({
+    status: statusSchema.optional(),
+    priority: prioritySchema.optional(),
+    label: z.string().min(1).max(32).optional(),
+  })
+  .strict()
+  .refine((f) => f.status !== undefined || f.priority !== undefined || f.label !== undefined, {
+    message: "at least one filter required",
+  });
+
+// name is trimmed then bounded 1..32 so a blank/whitespace-only name rejects as
+// BAD_REQUEST at this boundary (the same 32-char cap the DB CHECK enforces).
+export const viewsCreateInput = z.object({
+  name: z.string().trim().min(1).max(32),
+  filters: savedViewFilters,
+});
+
+export const viewsDeleteInput = z.object({
+  id: z.string().uuid(),
+});
+
+export type SavedViewFiltersInput = z.infer<typeof savedViewFilters>;
+export type ViewsCreateInput = z.infer<typeof viewsCreateInput>;
+export type ViewsDeleteInput = z.infer<typeof viewsDeleteInput>;
+
 export type CreateInput = z.infer<typeof createInput>;
 export type SetStatusInput = z.infer<typeof setStatusInput>;
 export type SetPriorityInput = z.infer<typeof setPriorityInput>;
