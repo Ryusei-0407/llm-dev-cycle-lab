@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write # triage が失敗を issue に起票・追記する
 
 jobs:
   # Full suite including @backend (full-stack) tests.
@@ -162,3 +163,44 @@ jobs:
           name: perf-traces
           path: e2e/test-results/
           retention-days: 14
+
+  # Triage lane: nightly は無人実行なので、失敗をローリング issue に起票して
+  # 翌セッションのループへ戻す(5夜連続赤が誰にも見えていなかった件の対策)。
+  # open な nightly-failure issue が既にあればコメントで追記し、無ければ新規
+  # 起票する — 1 連続失敗ストリーク = 1 issue に集約され、修正でクローズする。
+  triage:
+    runs-on: ubuntu-latest
+    needs: [full, llm-smoke, evals, perf]
+    if: ${{ failure() }}
+    steps:
+      - name: File or append the nightly failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RESULT_FULL: ${{ needs.full.result }}
+          RESULT_LLM_SMOKE: ${{ needs.llm-smoke.result }}
+          RESULT_EVALS: ${{ needs.evals.result }}
+          RESULT_PERF: ${{ needs.perf.result }}
+        run: |
+          body=$(printf '%s\n' \
+            "## Nightly failure — $(date -u +%Y-%m-%d) ([run]($RUN_URL))" \
+            "" \
+            "| job | result |" \
+            "| --- | --- |" \
+            "| full | $RESULT_FULL |" \
+            "| llm-smoke | $RESULT_LLM_SMOKE |" \
+            "| evals | $RESULT_EVALS |" \
+            "| perf | $RESULT_PERF |" \
+            "" \
+            "レポート artifact は run ページから (nightly-report / llm-smoke-report / evals-report / perf-traces)。")
+          gh label create nightly-failure -R "$REPO" \
+            --color B60205 --description "nightly レーンの失敗トリアージ" --force
+          existing=$(gh issue list -R "$REPO" --label nightly-failure --state open \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" -R "$REPO" --body "$body"
+          else
+            gh issue create -R "$REPO" --title "Nightly が失敗しています" \
+              --label nightly-failure --body "$body"
+          fi
