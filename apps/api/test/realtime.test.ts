@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
+import { workerSchemaStorage } from "../src/e2e-schema.js";
 import { createRealtimeHub, type RealtimeEvent, type RealtimeHub } from "../src/realtime.js";
 import { applySchemaAndSeed } from "../../../scripts/test-db.mjs";
 
@@ -173,6 +174,38 @@ describe("createRealtimeHub (unit) @feature-ws-realtime", () => {
 
       expect(closed.send).not.toHaveBeenCalled();
       expect(hub.size()).toBe(0);
+    },
+  );
+
+  it(
+    "scopes a broadcast to sockets registered under the broadcaster's worker scope",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "E2E worker 分離: scope 付きで register したソケットには、同じ scope の AsyncLocalStorage コンテキスト内からの broadcast だけが届き、scope 無し(既定)の broadcast は既定ソケットにだけ届くことを検証",
+      },
+    },
+    () => {
+      const hub = createRealtimeHub();
+      const w0 = mockSocket();
+      const w1 = mockSocket();
+      const unscoped = mockSocket();
+      hub.register(w0, "e2e_w0");
+      hub.register(w1, "e2e_w1");
+      hub.register(unscoped);
+      expect(hub.size()).toBe(3);
+
+      const event: RealtimeEvent = { type: "ticket.created", ticketId: "t-5" };
+      workerSchemaStorage.run("e2e_w0", () => hub.broadcast(event));
+      expect(w0.send).toHaveBeenCalledWith(JSON.stringify(event));
+      expect(w1.send).not.toHaveBeenCalled();
+      expect(unscoped.send).not.toHaveBeenCalled();
+
+      hub.broadcast(event); // ALS 外 = 既定 scope
+      expect(unscoped.send).toHaveBeenCalledWith(JSON.stringify(event));
+      expect(w0.send).toHaveBeenCalledTimes(1);
+      expect(w1.send).not.toHaveBeenCalled();
     },
   );
 });

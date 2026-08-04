@@ -31,6 +31,27 @@ const overlayHtml = (title: string) =>
   `${escapeHtml(title)}</div>`;
 
 export const test = base.extend<{ stepNarration: void }>({
+  // Worker DB isolation (apps/api/src/e2e-schema.ts): every request names its
+  // worker slot so the api routes ticket-domain queries to that worker's
+  // schema. parallelIndex (not workerIndex) — a crashed worker's replacement
+  // reuses the slot, and with it the schema its predecessor provisioned.
+  // Browser contexts carry a cookie: it is the only channel that also rides
+  // the WebSocket upgrade. The request fixture builds its jar from storageState
+  // alone, so it carries the header instead (extraHTTPHeaders feeds both the
+  // request fixture and page fetches; the api accepts either).
+  context: async ({ context, baseURL }, use, testInfo) => {
+    if (baseURL) {
+      await context.addCookies([
+        { name: "e2e_worker", value: String(testInfo.parallelIndex), url: baseURL },
+      ]);
+    }
+    await use(context);
+  },
+  // browserName の分割代入は Playwright の「fixture 第1引数はオブジェクト
+  // パターン必須」と oxlint の no-empty-pattern を両立させるための無害な依存。
+  extraHTTPHeaders: async ({ browserName: _ }, use, testInfo) => {
+    await use({ "x-e2e-worker": String(testInfo.parallelIndex) });
+  },
   stepNarration: [
     async ({ page }, use, testInfo) => {
       // 録画が無いラン(ローカルの retain-on-failure 等)では screencast が

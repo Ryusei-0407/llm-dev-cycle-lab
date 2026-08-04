@@ -2,10 +2,17 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import { GoogleGenAI } from "@google/genai";
 import { RPCHandler } from "@orpc/server/fetch";
 import { Hono } from "hono";
+import { getCookie } from "hono/cookie";
 import { streamSSE } from "hono/streaming";
 import { createAuthRouter } from "./auth/routes.js";
 import type { PasskeyVerifier } from "./auth/passkey.js";
 import { createPool } from "./db.js";
+import {
+  currentSchema,
+  isolationEnabled,
+  schemaForWorker,
+  workerSchemaStorage,
+} from "./e2e-schema.js";
 import { GeminiProvider } from "./llm/gemini.js";
 import { MockProvider } from "./llm/mock.js";
 import type { ChatMessage, LLMProvider } from "./llm/provider.js";
@@ -69,6 +76,21 @@ export function createApp(options: CreateAppOptions = {}): App {
   // 先に use しないと包めないため、ここが定位置(server-timing.ts 参照)。
   app.use("/api/*", serverTiming);
 
+  // E2E worker isolation (E2E_ISOLATE=1, see e2e-schema.ts): park the request's
+  // worker schema in AsyncLocalStorage before any route runs, so every store
+  // query — SSE streams included — resolves against that worker's schema.
+  // Browser contexts name their worker via cookie (it also rides the WS
+  // upgrade, where extra headers do not); Playwright request fixtures via
+  // header. Absent/invalid → default schema, identical to production.
+  if (isolationEnabled()) {
+    app.use("/api/*", async (c, next) => {
+      const worker = c.req.header("x-e2e-worker") ?? getCookie(c, "e2e_worker");
+      const schema = worker != null ? schemaForWorker(worker) : undefined;
+      if (!schema) return next();
+      return workerSchemaStorage.run(schema, next);
+    });
+  }
+
   app.get("/api/health", (c) => c.json({ ok: true }));
 
   // Auth is postgres-backed now (spec: specs/auth-db.md): users + sessions live
@@ -90,13 +112,16 @@ export function createApp(options: CreateAppOptions = {}): App {
     "/api/ws",
     upgradeWebSocket(async (c) => {
       const user = await resolveUser(c);
+      // Captured during the upgrade request: onOpen fires later on the socket's
+      // own event loop, outside the isolation middleware's async context.
+      const scope = currentSchema();
       return {
         onOpen: (_event, ws) => {
           if (!user) {
             ws.close(1008, "unauthenticated");
             return;
           }
-          hub.register(ws);
+          hub.register(ws, scope);
         },
       };
     }),

@@ -148,6 +148,10 @@ export default defineConfig({
         // 1Password 解錠状態にテストが依存しないようにする
         API_ENV_FILE: ".env.e2e-none",
         MOCK_DELAY_MS: "20",
+        // Worker-per-schema DB isolation (apps/api/src/e2e-schema.ts): each
+        // Playwright worker gets its own ticket tables, so one worker's
+        // creations can't shift another worker's list geometry mid-test.
+        E2E_ISOLATE: "1",
         // Force the provider for the test lane: real Gemini only under the
         // explicit LLM_SMOKE=1 nightly opt-in, mock otherwise. This overrides
         // any LLM_PROVIDER=gemini that leaked in from a local .env, so ordinary

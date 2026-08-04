@@ -4,6 +4,8 @@
 // re-fetches through its own authorised list/get. No payload beyond the id, so
 // authz stays with the existing read procedures.
 
+import { currentSchema } from "./e2e-schema.js";
+
 // ws readyState OPEN. Kept as a local constant so the hub never imports the ws
 // runtime (it only needs the numeric contract shared by browser + node ws).
 const WS_OPEN = 1;
@@ -21,20 +23,37 @@ export type RealtimeSocket = {
 };
 
 export type RealtimeHub = {
-  register(ws: RealtimeSocket): void;
+  // scope: E2E worker isolation (e2e-schema.ts). Sockets register under the
+  // schema scope their upgrade request carried, and a broadcast only reaches
+  // sockets in the broadcaster's scope — a worker's mutations must not ripple
+  // refetches into other workers' pages. Default scope "" (production: every
+  // socket and every broadcast).
+  register(ws: RealtimeSocket, scope?: string): void;
   broadcast(event: RealtimeEvent): void;
   size(): number;
 };
 
 export function createRealtimeHub(): RealtimeHub {
-  const sockets = new Set<RealtimeSocket>();
+  const buckets = new Map<string, Set<RealtimeSocket>>();
+
+  const bucket = (scope: string): Set<RealtimeSocket> => {
+    let set = buckets.get(scope);
+    if (!set) {
+      set = new Set();
+      buckets.set(scope, set);
+    }
+    return set;
+  };
 
   return {
-    register(ws) {
-      sockets.add(ws);
+    register(ws, scope = "") {
+      bucket(scope).add(ws);
     },
     broadcast(event) {
       const data = JSON.stringify(event);
+      // The broadcast scope is the caller's request scope: router handlers run
+      // inside the isolation middleware's AsyncLocalStorage context.
+      const sockets = bucket(currentSchema());
       // A socket that is no longer OPEN, or whose send throws (closed mid-flight),
       // is evicted here rather than waiting for a close event — broadcast is the
       // only place liveness is observed, so it doubles as the reaper.
@@ -51,7 +70,9 @@ export function createRealtimeHub(): RealtimeHub {
       }
     },
     size() {
-      return sockets.size;
+      let total = 0;
+      for (const set of buckets.values()) total += set.size;
+      return total;
     },
   };
 }
