@@ -131,30 +131,11 @@ export default defineConfig({
       },
     },
   ],
+  // chromium (機能E2E) のサーバはここでは起動しない: worker 毎に独立スタック
+  // (postgres コンテナ + api + web dev)を e2e/worker-stack.ts の worker fixture
+  // が worker 専用ポートで起動・破棄する。ここに残る webServer は components
+  // プロジェクト(ギャラリーの静的配信のみ、API/DB 不要)のための web 1本。
   webServer: [
-    {
-      // e2e-api.mjs ensures a temporary PostgreSQL (provision locally / reset a
-      // CI service container) before starting the api and tears down anything it
-      // started on exit. Playwright launches webServers before globalSetup, so
-      // the DB must be prepared inside the server command, not a global hook.
-      command: "node scripts/e2e-api.mjs",
-      cwd: root,
-      port: apiPort,
-      reuseExistingServer: !process.env.CI,
-      env: {
-        ...(process.env as Record<string, string>),
-        API_PORT: String(apiPort),
-        // E2E はモック強制なので .env(1Password FIFO)を読まない — 人間の
-        // 1Password 解錠状態にテストが依存しないようにする
-        API_ENV_FILE: ".env.e2e-none",
-        MOCK_DELAY_MS: "20",
-        // Force the provider for the test lane: real Gemini only under the
-        // explicit LLM_SMOKE=1 nightly opt-in, mock otherwise. This overrides
-        // any LLM_PROVIDER=gemini that leaked in from a local .env, so ordinary
-        // E2E always runs against the deterministic mock.
-        LLM_PROVIDER: process.env.LLM_SMOKE === "1" ? "gemini" : "mock",
-      },
-    },
     {
       command: "pnpm --filter @app/web dev",
       cwd: root,

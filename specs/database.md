@@ -58,12 +58,15 @@ createTicketStore(pool: Pool): {
 - **store 統合テスト(apps/api/test/tickets-store.test.ts)**: 一時DBに対して実行する形に書き直す。
   vitest の globalSetup(apps/api/test/global-setup.ts 等)で test-db.mjs を使い провision/reset、
   各テストは beforeEach で seed リセット(truncate + insert)して分離(M1 の共有ストア汚染の教訓)
-- **E2E**: playwright globalSetup で一時DB を provision(または DATABASE_URL 利用)し、
-  webServer(api)の env に DATABASE_URL を渡す。**既存の tickets E2E 3本はテストコード無変更で
-  緑になること**(ストア差し替えの後方互換の証明)
-- **CI(必須要件)**: unit / e2e ジョブに `postgres:18-alpine` の service container を追加し
-  DATABASE_URL を設定(llm-smoke / nightly full / perf も同様)。**DB を使うテストが CI で
-  実際に実行されること**が受け入れ条件(スキップや除外での回避は不可)
+- **E2E**: worker 毎の独立スタック(e2e/worker-stack.ts)が test-db.mjs の provision で
+  一時DBコンテナを worker 専用に起動し、api の env に DATABASE_URL を渡す。テスト毎に
+  applySchemaAndSeed でリセット(分離の単位はテスト)。**既存の tickets E2E 3本は
+  テストコード無変更で緑になること**(ストア差し替えの後方互換の証明)
+  (当初は playwright webServer + 共有DB。worker スタック分離への移行で現在の形)
+- **CI(必須要件)**: unit ジョブに `postgres:18-alpine` の service container を追加し
+  DATABASE_URL を設定。e2e 系ジョブ(PR e2e / nightly full / llm-smoke / perf)は
+  worker スタックが runner 上で docker provision するため service 不要。**DB を使う
+  テストが CI で実際に実行されること**が受け入れ条件(スキップや除外での回避は不可)
 
 ## E2E観点
 
