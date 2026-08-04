@@ -35,6 +35,42 @@ function assigneeLabel(email: string | null): string {
   return at > 0 ? email.slice(0, at) : email;
 }
 
+// Assignee avatar (design mock 01 .avatar): the first two letters of the email,
+// uppercased. Unassigned rows show none — the en-dash label carries that state.
+function assigneeInitials(email: string): string {
+  return email.slice(0, 2).toUpperCase();
+}
+
+// Updated-time column (design mock 01 .time): MM-DD in UTC so the row reads the
+// same regardless of viewer TZ (matches the detail panel's UTC date policy).
+function updatedLabel(iso: string): string {
+  const d = new Date(iso);
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${mm}-${dd}`;
+}
+
+// Priority glyph (design mock 01 .prio): a three-bar step icon — low fills 1 bar,
+// medium 2, high all 3 in the in-product high/orange accent. aria-hidden because
+// the adjacent text (Low/Medium/High) already names the level.
+const PRIORITY_FILLED: Record<Ticket["priority"], number> = { low: 1, medium: 2, high: 3 };
+
+function PriorityIcon({ priority }: { priority: Ticket["priority"] }) {
+  const filled = PRIORITY_FILLED[priority];
+  const on = priority === "high" ? "#f0883e" : "var(--ink-tertiary)";
+  return (
+    <span className="flex shrink-0 items-end gap-px" aria-hidden>
+      {[4, 7, 10].map((h, i) => (
+        <span
+          key={h}
+          className="w-[3px] rounded-[1px]"
+          style={{ height: h, backgroundColor: i < filled ? on : "var(--surface-4)" }}
+        />
+      ))}
+    </span>
+  );
+}
+
 export function TicketList({
   tickets,
   onStatusChange,
@@ -109,7 +145,7 @@ export function TicketList({
                 height: virtualRow.size,
                 transform: `translateY(${virtualRow.start}px)`,
               }}
-              className="grid h-12 grid-cols-[3.5rem_minmax(0,1fr)_9rem_5.5rem_6.5rem_4.5rem_8.5rem] items-center gap-3 rounded-lg border border-border bg-card px-4"
+              className="grid h-12 grid-cols-[3.5rem_minmax(0,1fr)_9rem_5.5rem_7.5rem_5rem_3rem_8.5rem] items-center gap-3 rounded-lg border border-border bg-card px-4 transition-colors hover:bg-surface-2"
             >
               {/* A semantic router Link (renders <a role=link>): keyboard-focusable
                   and it navigates in-app (SPA) rather than a full-document load.
@@ -131,22 +167,45 @@ export function TicketList({
                   <span
                     key={label.name}
                     data-testid="ticket-label"
-                    className="rounded px-1.5 py-0.5 text-xs font-medium text-white"
-                    style={{ backgroundColor: label.color }}
+                    // The label color lives on this element's style as a custom
+                    // property; the dot consumes it. Keeping it here (not only on a
+                    // child) means the chip element itself reflects its own color.
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-xs text-ink-subtle"
+                    style={{ ["--label-color" as string]: label.color }}
                   >
+                    <span className="size-[7px] shrink-0 rounded-full bg-[var(--label-color)]" />
                     {label.name}
                   </span>
                 ))}
               </span>
-              <span data-testid="ticket-assignee" className="truncate text-xs text-ink-subtle">
-                {assigneeLabel(ticket.assigneeEmail ?? null)}
+              {/* イニシャル円は ticket-assignee の外に置く — testid 内に入れると
+                  toHaveText("agent") のテキストアンカーが "AGagent" に壊れる。 */}
+              <span className="flex items-center gap-1.5 truncate text-xs text-ink-subtle">
+                {ticket.assigneeEmail ? (
+                  <span
+                    aria-hidden
+                    className="grid size-[18px] shrink-0 place-items-center rounded-full border border-[var(--hairline-strong)] bg-[var(--surface-4)] text-[9px] font-semibold text-ink-muted"
+                  >
+                    {assigneeInitials(ticket.assigneeEmail)}
+                  </span>
+                ) : null}
+                <span data-testid="ticket-assignee" className="truncate">
+                  {assigneeLabel(ticket.assigneeEmail ?? null)}
+                </span>
               </span>
               <span>
                 <StatusBadge status={ticket.status} />
               </span>
               {/* CSS capitalize だと DOM テキストは生値のまま。表示・支援技術・
-                  テキストアンカーが一致するようラベル表記を実テキストで出す。 */}
-              <span className="text-xs text-ink-subtle">{PRIORITY_LABELS[ticket.priority]}</span>
+                  テキストアンカーが一致するようラベル表記を実テキストで出す。
+                  優先度アイコン(mock 01 .prio)をテキストの左に併置。 */}
+              <span className="flex items-center gap-1.5 text-xs text-ink-subtle">
+                <PriorityIcon priority={ticket.priority} />
+                {PRIORITY_LABELS[ticket.priority]}
+              </span>
+              <span data-testid="ticket-updated" className="text-xs text-ink-tertiary tabular-nums">
+                {ticket.updatedAt ? updatedLabel(ticket.updatedAt) : ""}
+              </span>
               {showStatusControl ? (
                 <select
                   data-testid="ticket-status-select"
