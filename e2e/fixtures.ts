@@ -1,4 +1,5 @@
 import { test as base } from "@playwright/test";
+import { resetStackDb, startStack, type WorkerStack } from "./worker-stack";
 
 // Playwright 組み込みの録画オーバーレイ(video.show.test)は、ステップ名の前に
 // 必ず英語の titlePath(ファイル名 › describe名 › テスト名)を重ねて描画する。
@@ -30,7 +31,37 @@ const overlayHtml = (title: string) =>
   `font-family:-apple-system,'Hiragino Kaku Gothic ProN',sans-serif;text-align:center;">` +
   `${escapeHtml(title)}</div>`;
 
-export const test = base.extend<{ stepNarration: void }>({
+export const test = base.extend<
+  { stepNarration: void; dbReset: void },
+  { workerStack: WorkerStack }
+>({
+  // Worker-per-stack isolation (worker-stack.ts): this worker's own postgres
+  // container + api + web dev server. Tests reach ONLY this stack (baseURL
+  // below), so nothing another worker does can be observed here.
+  // browser への依存は Playwright の「fixture 第1引数はオブジェクトパターン
+  // 必須」と oxlint の no-empty-pattern を両立させるための無害な参照。
+  workerStack: [
+    async ({ browser: _ }, use, workerInfo) => {
+      const stack = await startStack(workerInfo.workerIndex);
+      await use(stack);
+      await stack.stop();
+    },
+    { scope: "worker", auto: true },
+  ],
+  baseURL: async ({ workerStack }, use) => {
+    await use(workerStack.webURL);
+  },
+  // Every test starts from the identical database state: schema + seed +
+  // fixed-sid sessions, applied to this worker's own container (~0.1-0.3s).
+  // Retries therefore reproduce the exact initial conditions of the first
+  // attempt instead of inheriting its leftovers.
+  dbReset: [
+    async ({ workerStack }, use) => {
+      await resetStackDb(workerStack.dbURL);
+      await use();
+    },
+    { auto: true },
+  ],
   stepNarration: [
     async ({ page }, use, testInfo) => {
       // 録画が無いラン(ローカルの retain-on-failure 等)では screencast が
