@@ -30,8 +30,8 @@ function StatusIcon({ status }: { status: TicketStatus }) {
   if (status === "in_progress") {
     return (
       <svg viewBox="0 0 13 13" className="size-3 shrink-0" aria-hidden>
-        <circle cx="6.5" cy="6.5" r="5.75" fill="none" stroke="#f2c94c" strokeWidth="1.5" />
-        <path d="M6.5 6.5 V1.6 A4.9 4.9 0 0 1 6.5 11.4 Z" fill="#f2c94c" />
+        <circle cx="6.5" cy="6.5" r="5.75" fill="none" stroke="var(--warn)" strokeWidth="1.5" />
+        <path d="M6.5 6.5 V1.6 A4.9 4.9 0 0 1 6.5 11.4 Z" fill="var(--warn)" />
       </svg>
     );
   }

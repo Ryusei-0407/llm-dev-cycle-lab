@@ -10,16 +10,14 @@ const COLUMNS: { status: TicketStatus; label: string }[] = [
   { status: "resolved", label: "Resolved" },
 ];
 
-// APP_DESIGN priority/progress accents that the shipped theme (styles.css) does
-// not expose as CSS variables: literal hex from the design source (mock --high /
-// --warn). Kept here so the glyphs stay faithful without touching the theme.
-const HIGH = "#f0883e";
-const WARN = "#f2c94c";
+// APP_DESIGN priority/progress accents, from the theme (styles.css :root).
+const HIGH = "var(--high)";
+const WARN = "var(--warn)";
 
 // Priority as a three-step bar glyph (mock04 .prio, Linear 風): all three bars
 // lit for high in the warn/high hue, two for medium, one for low; unlit bars
-// fall back to surface-4. Colours ride inline styles because --surface-4 has no
-// Tailwind utility and --high is not a theme token.
+// fall back to surface-4. Colours ride inline styles because the bar heights
+// are data-driven anyway (style is already the channel here).
 const PRIORITY_BARS: Record<TicketPriority, { lit: number; color: string }> = {
   low: { lit: 1, color: "var(--ink-tertiary)" },
   medium: { lit: 2, color: "var(--ink-tertiary)" },

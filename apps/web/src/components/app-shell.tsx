@@ -162,7 +162,7 @@ export function AppShell({ user, children }: { user: User; children: React.React
               search={{ priority: "high" }}
               className={navItemClass}
             >
-              <span aria-hidden="true" className="size-[7px] rounded-full bg-[#f0883e]" />
+              <span aria-hidden="true" className="size-[7px] rounded-full bg-high" />
               高優先度
             </Link>
             <Link
@@ -171,7 +171,7 @@ export function AppShell({ user, children }: { user: User; children: React.React
               search={{ status: "open" }}
               className={navItemClass}
             >
-              <span aria-hidden="true" className="size-[7px] rounded-full bg-[#f2c94c]" />
+              <span aria-hidden="true" className="size-[7px] rounded-full bg-warn" />
               未対応のみ
             </Link>
           </>

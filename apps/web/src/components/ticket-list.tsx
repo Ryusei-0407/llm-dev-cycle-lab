@@ -57,7 +57,7 @@ const PRIORITY_FILLED: Record<Ticket["priority"], number> = { low: 1, medium: 2,
 
 function PriorityIcon({ priority }: { priority: Ticket["priority"] }) {
   const filled = PRIORITY_FILLED[priority];
-  const on = priority === "high" ? "#f0883e" : "var(--ink-tertiary)";
+  const on = priority === "high" ? "var(--high)" : "var(--ink-tertiary)";
   return (
     <span className="flex shrink-0 items-end gap-px" aria-hidden>
       {[4, 7, 10].map((h, i) => (
