@@ -51,9 +51,10 @@ export function DraftPanel({
   return (
     <section
       data-testid="draft-panel"
-      className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 p-4"
+      className="flex flex-col gap-3 rounded-lg border border-hairline border-l-2 border-l-primary bg-surface-2 p-4"
     >
       <div className="flex items-center gap-3">
+        <span className="size-2 rounded-full bg-primary" aria-hidden="true" />
         <h2 className="flex-1 text-sm font-semibold text-ink">Reply draft</h2>
         <Button
           type="button"
@@ -72,7 +73,7 @@ export function DraftPanel({
         </p>
       )}
 
-      {draft && <p className="text-sm whitespace-pre-wrap text-ink">{draft}</p>}
+      {draft && <p className="text-sm whitespace-pre-wrap text-ink-muted">{draft}</p>}
 
       {error && (
         <p data-testid="draft-error" role="alert" className="text-sm text-destructive">
