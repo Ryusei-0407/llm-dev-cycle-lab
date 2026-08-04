@@ -145,12 +145,14 @@ function TicketsPage() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   // Clamp the active index into the loaded range when the row set changes
-  // (filter change / re-fetch). 行数が減って範囲外になったら末尾へ、0件なら未選択。
+  // (filter change / re-fetch). 行数が減って範囲外になったら末尾へ。0件は据え置き:
+  // クエリ切替中は一時的に 0 件を経由するため、ここで null に落とすと
+  // 「クランプ」ではなく「リセット」になる。0件表示中は data-active な行が
+  // 存在せず、Enter/o も !ticket ガードで無反応 — 次のデータ到着時にクランプされる。
   const ticketCount = tickets.length;
   useEffect(() => {
     setActiveIndex((current) => {
-      if (current === null) return null;
-      if (ticketCount === 0) return null;
+      if (current === null || ticketCount === 0) return current;
       return Math.min(current, ticketCount - 1);
     });
   }, [ticketCount]);
