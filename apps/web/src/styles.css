@@ -33,6 +33,11 @@
   --brand-hover: #828fff;
   --brand-focus: #5e69d1;
   --success: #27a644;
+  /* Progress/priority accents (APP_DESIGN mock --high / --warn). Previously
+   * inline hex literals scattered across components — the theme is the single
+   * source now. */
+  --high: #f0883e;
+  --warn: #f2c94c;
 
   --background: var(--canvas);
   --foreground: var(--ink);
@@ -98,8 +103,20 @@
   --color-ink-muted: var(--ink-muted);
   --color-ink-subtle: var(--ink-subtle);
   --color-ink-tertiary: var(--ink-tertiary);
+  /* Export the FULL surface ladder and hairlines. surface-1/-4 and hairline*
+   * were missing here, which made utilities like bg-surface-1/border-hairline
+   * silently no-op (an unknown Tailwind color utility generates nothing) —
+   * borders happened to render via the base `* { border-border }` fallback,
+   * but surface fills were lost. */
+  --color-canvas: var(--canvas);
+  --color-surface-1: var(--surface-1);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-high: var(--high);
+  --color-warn: var(--warn);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
