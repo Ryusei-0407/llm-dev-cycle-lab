@@ -72,8 +72,8 @@ export function isEditableTarget(target: EventTarget | null): boolean;
 - E2E 失敗系: 専用のエラー UI を持つ失敗が存在しないため無し(規約の上限内)
 - タグ: `@feature-keyboard-nav`。feature-map.json に登録:
   `"keyboard-nav": ["apps/web/src/lib/list-keys.ts", "apps/web/src/routes/tickets.tsx",
-  "apps/web/src/routes/tickets_.$id.tsx", "apps/web/src/components/ticket-list.tsx",
-  "e2e/tests/keyboard-nav.spec.ts"]`
+"apps/web/src/routes/tickets_.$id.tsx", "apps/web/src/components/ticket-list.tsx",
+"e2e/tests/keyboard-nav.spec.ts"]`
 
 ## 実装メモ(制約)
 

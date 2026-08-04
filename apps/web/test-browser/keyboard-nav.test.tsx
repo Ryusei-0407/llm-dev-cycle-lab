@@ -1,4 +1,4 @@
-import { page } from "@vitest/browser/context";
+import { page, userEvent } from "@vitest/browser/context";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -118,17 +118,17 @@ test(
 
     // j: 先頭行がアクティブになり bg-surface-2 が付く。
     await page.getByTestId("ticket-list").click();
-    await page.keyboard.press("j");
+    await userEvent.keyboard("j");
     await expect.element(row(1)).toHaveAttribute("data-active", "true");
     await expect.element(row(1)).toHaveClass(/bg-surface-2/);
 
     // j: 2 行目へ移り、1 行目の data-active は外れる。
-    await page.keyboard.press("j");
+    await userEvent.keyboard("j");
     await expect.element(row(2)).toHaveAttribute("data-active", "true");
     await expect.element(row(1)).not.toHaveAttribute("data-active", "true");
 
     // k: 1 行目へ戻る。
-    await page.keyboard.press("k");
+    await userEvent.keyboard("k");
     await expect.element(row(1)).toHaveAttribute("data-active", "true");
     await expect.element(row(2)).not.toHaveAttribute("data-active", "true");
   },
@@ -148,8 +148,8 @@ test(
     await expect.element(row(1)).toBeVisible();
 
     await page.getByTestId("search-input").click();
-    await expect.element(page.getByTestId("search-input")).toBeFocused();
-    await page.keyboard.press("j");
+    await expect.element(page.getByTestId("search-input")).toHaveFocus();
+    await userEvent.keyboard("j");
 
     // input フォーカス中の j は無視され、どの行もアクティブにならない。
     expect(

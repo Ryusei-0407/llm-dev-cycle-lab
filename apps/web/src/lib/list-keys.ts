@@ -19,10 +19,12 @@ export function nextActiveIndex(
 
 // keydown を無視すべきターゲットか(input/textarea/select/contenteditable)。
 // contenteditable は isContentEditable で見る — 属性値の "true"/"" と継承の両方を
-// ブラウザが解決した結果を使う。
+// ブラウザが解決した結果を使う。instanceof HTMLElement では判定しない:
+// DOM グローバルの無い node レーンで検証できず、iframe など別 realm の要素も
+// 取りこぼす。要素が標準で公開する形(tagName / isContentEditable)だけを見る。
 export function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  const tag = target.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  const el = target as { tagName?: unknown; isContentEditable?: unknown } | null;
+  if (!el || typeof el.tagName !== "string") return false;
+  if (el.isContentEditable === true) return true;
+  return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT";
 }
