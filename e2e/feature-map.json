@@ -161,5 +161,12 @@
     "apps/web/src/components/ticket-list.tsx",
     "apps/web/src/routes/tickets.tsx",
     "e2e/tests/bulk-actions.spec.ts"
+  ],
+  "keyboard-nav": [
+    "apps/web/src/lib/list-keys.ts",
+    "apps/web/src/routes/tickets.tsx",
+    "apps/web/src/routes/tickets_.$id.tsx",
+    "apps/web/src/components/ticket-list.tsx",
+    "e2e/tests/keyboard-nav.spec.ts"
   ]
 }
