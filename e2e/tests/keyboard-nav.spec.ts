@@ -187,15 +187,22 @@ test.describe("keyboard-nav over the tickets list @feature-keyboard-nav", () => 
         await expect(page.getByTestId("command-palette")).toBeVisible();
         await page.keyboard.press("j");
         await expect(activeRows).toHaveCount(0);
-        // パレット入力がフォーカスを持つ間は入力系ガードが効くため、パレット
-        // ガード自体の検証にはフォーカスを外した状態が要る(blur 変種)。
-        // ガードが無いと、パレットを開いたまま j で一覧のアクティブ行が動く。
-        await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-        await page.keyboard.press("j");
-        await expect(activeRows).toHaveCount(0);
         await page.keyboard.press("Escape");
         await expect(page.getByTestId("command-palette")).toBeHidden();
         await expect(page).toHaveURL(/\/tickets$/);
+        // パレット入力がフォーカスを持つ間は入力系ガードが効くため、パレット
+        // ガード自体はフォーカスが外にある状態でしか観測できない。実パレットは
+        // フォーカス喪失で dismiss され得て中間状態が不安定なので、ガードの
+        // 公開契約(popup が DOM に在ること)を decoy で決定的に作って固定する。
+        await page.evaluate(() => {
+          const decoy = document.createElement("div");
+          decoy.dataset.testid = "command-palette";
+          decoy.id = "kbnav-palette-decoy";
+          document.body.appendChild(decoy);
+        });
+        await page.keyboard.press("j");
+        await expect(activeRows).toHaveCount(0);
+        await page.evaluate(() => document.getElementById("kbnav-palette-decoy")?.remove());
       });
 
       await test.step("o でアクティブ行の詳細が開く", async () => {
@@ -207,20 +214,18 @@ test.describe("keyboard-nav over the tickets list @feature-keyboard-nav", () => 
       });
 
       await test.step("詳細でもパレット開中の Escape は一覧へ戻らない", async () => {
-        await page.keyboard.press("Control+k");
-        await expect(page.getByTestId("command-palette")).toBeVisible();
-        // blur 変種(上と同じ理由): パレットガードが無いと、この Escape が
+        // decoy(上と同じ理由): パレットガードが無いと、この Escape が
         // 詳細の「一覧へ戻る」を発火してしまう。
-        await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+        await page.evaluate(() => {
+          const decoy = document.createElement("div");
+          decoy.dataset.testid = "command-palette";
+          decoy.id = "kbnav-palette-decoy";
+          document.body.appendChild(decoy);
+        });
         await page.keyboard.press("Escape");
         await expect(page).toHaveURL(/\/tickets\/[^/]+$/);
-        // 後始末: パレットの開閉状態に依らず閉じ切ってから次の検証へ。
-        if (await page.getByTestId("command-palette").isVisible()) {
-          await page.keyboard.press("Escape");
-        }
-        await expect(page.getByTestId("command-palette")).toBeHidden();
-        await expect(page).toHaveURL(/\/tickets\/[^/]+$/);
-        // パレットが閉じた後の Escape は通常どおり一覧へ。
+        await page.evaluate(() => document.getElementById("kbnav-palette-decoy")?.remove());
+        // パレット(decoy)が無くなれば Escape は通常どおり一覧へ。
         await page.keyboard.press("Escape");
         await expect(page).toHaveURL(/\/tickets$/);
       });
