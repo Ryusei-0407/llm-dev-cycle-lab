@@ -261,4 +261,27 @@ describe("bulk-actions: bulkUpdate のブロードキャスト (HTTP面) @featur
       expect(hub.events).toEqual([{ type: "ticket.updated", ticketId: TICKET_1 }]);
     },
   );
+  it(
+    "反証固定: 非 agent の assigneeEmail は BAD_REQUEST(400)",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "敵対的レビューの反証固定: bulkUpdate の patch.assigneeEmail に customer メールを渡すと store の BadRequestError が HTTP 400 + oRPC code BAD_REQUEST にマップされることを検証(setAssignee と同じ契約の bulk 側)",
+      },
+    },
+    async () => {
+      const app = createApp();
+      const cookie = await cookieFor(app, SEED.agent);
+      const res = await rpc(
+        app,
+        "bulkUpdate",
+        { ids: [TICKET_1], patch: { assigneeEmail: "customer@example.com" } },
+        cookie,
+      );
+      expect(res.status).toBe(400);
+      const err = unwrap(await res.json()) as { code?: string };
+      expect(err.code).toBe("BAD_REQUEST");
+    },
+  );
 });

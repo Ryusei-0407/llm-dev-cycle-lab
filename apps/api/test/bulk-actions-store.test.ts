@@ -12,7 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 // db.ts holds the connection helper, store.ts exposes createTicketStore(pool) +
 // a named NotFoundError.
 import { createPool, type Pool } from "../src/db.js";
-import { createTicketStore, NotFoundError } from "../src/tickets/store.js";
+import { BadRequestError, createTicketStore, NotFoundError } from "../src/tickets/store.js";
 import { applySchemaAndSeed } from "../../../scripts/test-db.mjs";
 
 // Connection comes from the vitest globalSetup (apps/api/test/global-setup.ts).
@@ -199,6 +199,80 @@ describe("bulk-actions store: bulkUpdate @feature-bulk-actions", () => {
       expect(after2.ticket.updatedAt).toBe(before2.ticket.updatedAt);
       // before1 は触れていないので参照だけ(未使用変数回避)。
       expect(before1.ticket.id).toBe(TICKET_1);
+    },
+  );
+  it(
+    "反証固定: priority の一括変更が適用され priority_changed が記録される",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "敵対的レビューの反証固定: patch.priority を送るテストが皆無で priority ブランチを無効化しても全テストが素通りした。bulkUpdate([id],{priority:'low'}) で priority が書き変わり updated=1・priority_changed(payload from→to)が記録されることを検証",
+      },
+    },
+    async () => {
+      const before = await store.get(TICKET_1);
+      expect(before.ticket.priority).not.toBe("low");
+
+      const result = await store.bulkUpdate([TICKET_1], { priority: "low" }, AGENT_EMAIL);
+      expect(result.updated).toBe(1);
+
+      const after = await store.get(TICKET_1);
+      expect(after.ticket.priority).toBe("low");
+      expect(after.events).toHaveLength(1);
+      expect(after.events[0].type).toBe("priority_changed");
+      expect(after.events[0].payload).toEqual({ from: before.ticket.priority, to: "low" });
+    },
+  );
+
+  it(
+    "反証固定: 非 agent の assigneeEmail は BadRequestError(書き込まれない)",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "敵対的レビューの反証固定: agent 存在チェックを無効化しても全テストが素通りした(assignee_email に FK は無く不正メールが黙って書ける)。customer メールを assigneeEmail に bulkUpdate すると BadRequestError で全体が失敗し、チケットが据え置かれることを検証",
+      },
+    },
+    async () => {
+      const before = await store.get(TICKET_1);
+      await expect(
+        store.bulkUpdate([TICKET_1], { assigneeEmail: "customer@example.com" }, AGENT_EMAIL),
+      ).rejects.toBeInstanceOf(BadRequestError);
+      const after = await store.get(TICKET_1);
+      expect(after.ticket.assigneeEmail).toBe(before.ticket.assigneeEmail);
+      expect(after.events).toHaveLength(0);
+    },
+  );
+
+  it(
+    "反証固定: 多フィールド patch はフィールド毎のイベントを出しつつ updated=1",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "敵対的レビューの反証固定: {status, priority} を同一 patch で送るケースが皆無だった。両方が実変更のとき status_changed と priority_changed が1件ずつ記録され、updated はチケット単位の 1 であることを検証(フィールド数でなくチケット数を数える)",
+      },
+    },
+    async () => {
+      const before = await store.get(TICKET_1);
+      expect(before.ticket.status).not.toBe("resolved");
+      expect(before.ticket.priority).not.toBe("low");
+
+      const result = await store.bulkUpdate(
+        [TICKET_1],
+        { status: "resolved", priority: "low" },
+        AGENT_EMAIL,
+      );
+      expect(result.updated).toBe(1);
+
+      const after = await store.get(TICKET_1);
+      expect(after.ticket.status).toBe("resolved");
+      expect(after.ticket.priority).toBe("low");
+      expect(after.events.map((e) => e.type).sort()).toEqual([
+        "priority_changed",
+        "status_changed",
+      ]);
     },
   );
 });
