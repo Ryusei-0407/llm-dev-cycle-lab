@@ -21,6 +21,8 @@ Tailwind v4 + shadcn/Base UI)、`e2e` = Playwright。
 
 ## 作業スタイル
 
+- セッション開始時に `nightly-failure` ラベルの open issue(nightly の自動起票)を
+  確認し、赤があれば新規作業よりトリアージを優先する
 - 要求されたことを要求された範囲で完了させれば十分。追加でやると良さそうなことを
   見つけたら、完了報告に提案として添えて次の指示を待つ
 - **PR は機能単位(1機能 = 1ブランチ = 1PR)**。ここでの「機能」は feature-map /
@@ -38,6 +40,9 @@ Tailwind v4 + shadcn/Base UI)、`e2e` = Playwright。
 - Playwright 同梱の ffmpeg は GIF エンコーダを持たない。PRメディア用の GIF 変換には
   実 ffmpeg が必要(CI は apt でインストール)
 - TDDゲート(Stop hook)は `.claude/tdd-gate` ファイルの有無で on/off(`touch` / `rm`)
+- 共有リソースへ書き込むワークフローは並走させない: update-snapshots の dispatch は
+  常に1本ずつ(並走 PR が同じ VRT baseline を再生成すると PNG の binary conflict)、
+  ci-media ブランチへの push も同様(リトライで緩和済みだが並走を作らないのが原則)
 - PRコメントの画像は `ci-media` ブランチ + 同一リポジトリ blob URL(`?raw=true`)方式。
   private リポジトリでもインライン表示される(camo で壊れるのは外部ドメイン画像のみ)
 - ルーティングは TanStack Router の file-based(`apps/web/src/routes/`)。route ツリーは
