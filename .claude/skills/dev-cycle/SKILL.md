@@ -64,3 +64,21 @@ PR 作成後、完了報告の前に:
 - UI の見た目を変えた PR は `gh workflow run update-snapshots.yml --ref <branch>` で
   VRT baseline を再生成する。**dispatch は常に1本ずつ**(並走 PR で同じ baseline を
   再生成すると binary conflict になる。ci-media 等の共有ブランチへの書き込みも同様)
+
+## 依存する作業列は Stacked PR で積む(マージ待ちで直列化しない)
+
+前の機能・修正がマージされないと次に進めない作業列は、マージを待たずに
+Stacked PR(`gh stack init / add / submit`)でレイヤとして積む。各レイヤは
+独立にレビュー・CI され、下のレイヤがマージされると上は自動 rebase/retarget
+される。人間のマージ往復がサイクルタイムの支配項になるのを防ぐのが目的。
+
+- **レイヤの単位も機能単位**(1レイヤ = 1機能 = 1PR)。スタックは機能を
+  「積む」ためのもので、複数機能を1レイヤに「束ねる」理由にはならない。
+  例外は同一機能内の「土台 → 適用」分割(各レイヤの検証が独立に閉じる場合。
+  スタック全体で1機能)
+- **VRT baseline の再生成は main を直接 target しているレイヤだけ**で行う。
+  上位レイヤで regen すると、下位マージ時の自動 rebase で baseline PNG が
+  binary conflict する(単一飛行原則のスタック版)。上位レイヤの見た目変更は
+  自分が main 直 target に降りてきてから regen する
+- 深いスタックは下位マージのたびに上位の CI が再実行される。e2e ~8分の
+  現状では **3〜4 レイヤまで**を目安にする
