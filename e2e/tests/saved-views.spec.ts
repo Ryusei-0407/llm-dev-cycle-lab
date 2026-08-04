@@ -72,8 +72,9 @@ test.describe("saved-views @feature-saved-views", () => {
       });
 
       await test.step("削除ボタンでビューが一覧から消える", async () => {
-        const row = page.getByTestId("sidebar-user-view").filter({ hasText: VIEW_NAME });
-        await row.getByTestId("sidebar-user-view-delete").click();
+        // 削除ボタンはビュー Link の内側ではなく兄弟(button-in-Link は
+        // invalid HTML)。仕様が固定する aria-label で特定する。
+        await page.getByRole("button", { name: `Delete view ${VIEW_NAME}` }).click();
         await expect(
           page.getByTestId("sidebar-user-view").filter({ hasText: VIEW_NAME }),
         ).toHaveCount(0);

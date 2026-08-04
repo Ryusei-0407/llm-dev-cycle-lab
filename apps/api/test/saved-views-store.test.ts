@@ -125,7 +125,7 @@ describe("saved-views store: createView/listViews/deleteView @feature-saved-view
       annotation: {
         type: "description",
         description:
-          "自分が作ったビューを deleteView すると { ok: true } を返し、以降 listViews からそのビューが消えることを検証",
+          "自分が作ったビューを deleteView すると解決し、以降 listViews からそのビューが消えることを検証",
       },
     },
     async () => {
@@ -134,8 +134,7 @@ describe("saved-views store: createView/listViews/deleteView @feature-saved-view
         name: "消すビュー",
         filters: { status: "open" },
       });
-      const result = await store.deleteView({ id: view.id, userEmail: AGENT });
-      expect(result).toEqual({ ok: true });
+      await expect(store.deleteView(AGENT, view.id)).resolves.toBeUndefined();
       const mine = await store.listViews(AGENT);
       expect(mine.some((v) => v.id === view.id)).toBe(false);
     },
@@ -156,9 +155,7 @@ describe("saved-views store: createView/listViews/deleteView @feature-saved-view
         name: "他人のビュー",
         filters: { status: "open" },
       });
-      await expect(
-        store.deleteView({ id: othersView.id, userEmail: AGENT }),
-      ).rejects.toBeInstanceOf(NotFoundError);
+      await expect(store.deleteView(AGENT, othersView.id)).rejects.toBeInstanceOf(NotFoundError);
       // 他人のビューは削除されず残る(所有者の list で確認)。
       const theirs = await store.listViews(OTHER);
       expect(theirs.some((v) => v.id === othersView.id)).toBe(true);
@@ -175,9 +172,7 @@ describe("saved-views store: createView/listViews/deleteView @feature-saved-view
       },
     },
     async () => {
-      await expect(store.deleteView({ id: MISSING_ID, userEmail: AGENT })).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(store.deleteView(AGENT, MISSING_ID)).rejects.toBeInstanceOf(NotFoundError);
     },
   );
 });
