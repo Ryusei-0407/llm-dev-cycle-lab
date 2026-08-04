@@ -1,13 +1,14 @@
 import { ORPCError } from "@orpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { type FormEvent, useState } from "react";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { type FormEvent, useEffect, useState } from "react";
 import { fetchMe } from "@/auth/api";
 import { AppShell } from "@/components/app-shell";
 import { DraftPanel } from "@/components/draft-panel";
 import { MessageThread } from "@/components/message-thread";
 import { TicketProperties } from "@/components/ticket-properties";
 import { Button } from "@/components/ui/button";
+import { isEditableTarget } from "@/lib/list-keys";
 import { orpc } from "@/lib/orpc";
 import { useSessionUser } from "@/lib/session";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets";
@@ -43,7 +44,23 @@ function isForbidden(error: unknown): boolean {
 
 function TicketDetailPage() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  // Esc で一覧へ戻る (spec: specs/keyboard-nav.md)。修飾なし単键のみ。入力系
+  // フォーカス中・パレット表示中は何もしない(一覧側と同じガード。パレットの Escape
+  // ハンドリングを奪わないため、開いている間だけ DOM に出る popup で検出する)。
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isEditableTarget(e.target)) return;
+      if (document.querySelector('[data-testid="command-palette"]')) return;
+      void navigate({ to: "/tickets" });
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [navigate]);
   // Generate draft and the property editors are agent-only (specs/customer-portal.md,
   // and the draft route is 403 for customers per specs/authz.md). Gate on role rather
   // than relying on controls happening to be absent.
