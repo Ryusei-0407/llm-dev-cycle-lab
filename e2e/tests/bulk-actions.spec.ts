@@ -89,8 +89,8 @@ test.describe("bulk-actions over oRPC @feature-bulk-actions", () => {
       await test.step("両行のバッジが In progress・選択解除・バー消滅を確認する", async () => {
         const rowA = page.getByTestId("ticket-row").filter({ hasText: subjectA });
         const rowB = page.getByTestId("ticket-row").filter({ hasText: subjectB });
-        await expect(rowA.getByTestId("ticket-status")).toContainText("In progress");
-        await expect(rowB.getByTestId("ticket-status")).toContainText("In progress");
+        await expect(rowA.getByTestId("status-badge")).toContainText("In progress");
+        await expect(rowB.getByTestId("status-badge")).toContainText("In progress");
         // 適用成功で選択解除 → バー消滅。
         await expect(page.getByTestId("bulk-bar")).toBeHidden();
         await snap(page, testInfo, "一括適用後");
@@ -164,7 +164,7 @@ test.describe("bulk-actions over oRPC @feature-bulk-actions", () => {
         ).toBeVisible();
         // 行のバッジは Resolved になっていない(適用されていない)。
         const rowA = page.getByTestId("ticket-row").filter({ hasText: subjectA });
-        await expect(rowA.getByTestId("ticket-status")).not.toContainText("Resolved");
+        await expect(rowA.getByTestId("status-badge")).not.toContainText("Resolved");
         // 選択は維持され、バーは出たまま(リトライ可能)。
         await expect(page.getByTestId("bulk-bar")).toBeVisible();
         await expect(page.getByTestId("bulk-count")).toContainText("2");
