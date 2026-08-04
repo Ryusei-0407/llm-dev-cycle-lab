@@ -34,10 +34,7 @@
     "apps/web/src/components/message-*",
     "apps/web/src/lib/orpc.ts"
   ],
-  "slow-hint": [
-    "apps/web/src/chat/useChat.ts",
-    "apps/web/src/App.story.tsx"
-  ],
+  "slow-hint": ["apps/web/src/chat/useChat.ts", "apps/web/src/App.story.tsx"],
   "reply-draft": [
     "apps/api/src/tickets/draft.ts",
     "apps/api/src/app.ts",
@@ -52,10 +49,7 @@
     "apps/web/src/components/ticket-list.tsx",
     "apps/web/src/routes/__root.tsx"
   ],
-  "kanban": [
-    "apps/web/src/routes/board.tsx",
-    "apps/web/src/components/kanban-board.tsx"
-  ],
+  "kanban": ["apps/web/src/routes/board.tsx", "apps/web/src/components/kanban-board.tsx"],
   "ticket-model": [
     "apps/api/src/tickets/store.ts",
     "apps/api/src/tickets/router.ts",
@@ -90,11 +84,7 @@
     "apps/web/src/components/message-thread.tsx",
     "e2e/tests/detail-panel.spec.ts"
   ],
-  "visual": [
-    "apps/web/src/**",
-    "e2e/tests/visual.spec.ts",
-    "e2e/components/visual.spec.ts"
-  ],
+  "visual": ["apps/web/src/**", "e2e/tests/visual.spec.ts", "e2e/components/visual.spec.ts"],
   "app-shell": [
     "apps/web/src/components/app-shell.tsx",
     "apps/web/src/components/ticket-list.tsx",
@@ -163,7 +153,5 @@
     "apps/web/src/routes/tickets.tsx",
     "e2e/tests/saved-views.spec.ts"
   ],
-  "evals": [
-    "apps/api/evals/**"
-  ]
+  "evals": ["apps/api/evals/**"]
 }
