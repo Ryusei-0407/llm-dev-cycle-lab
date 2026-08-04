@@ -75,6 +75,9 @@ export function TicketList({
   tickets,
   onStatusChange,
   showStatusControl = true,
+  selectable = false,
+  selectedIds,
+  onToggleSelect,
   onEndReached,
   height,
 }: {
@@ -84,6 +87,12 @@ export function TicketList({
   // (specs/customer-portal.md). Defaults to shown so the component keeps its
   // agent behavior wherever the flag isn't passed.
   showStatusControl?: boolean;
+  // Bulk-select checkbox column (spec: specs/bulk-actions.md). Agent-only; when
+  // false the leading grid cell stays an empty span so the customer layout does
+  // not shift (既存 grid の流儀 — customer でも列幅を保持する)。
+  selectable?: boolean;
+  selectedIds?: ReadonlySet<string>;
+  onToggleSelect?: (id: string) => void;
   // Fired each time the visible tail crosses 末尾-5行 (spec); the list route
   // wires this to fetch the next infinite page.
   onEndReached?: () => void;
@@ -134,9 +143,10 @@ export function TicketList({
               data-testid="ticket-row"
               // 固定幅カラムのグリッド(PC 前提)。flex の内容依存幅だと文字列長で
               // 各カラムの横位置が行ごとに揺れるため、subject 以外は幅を固定して
-              // 縦のラインを揃える。customer 表示ではセレクト列は空のまま保持し、
-              // ロール差でレイアウトが変わらないようにする。仮想化で各行は absolute
-              // 配置になるため、グリッド定義は行要素側に残す。
+              // 縦のラインを揃える。先頭は bulk-select 用の列で、customer / 非選択
+              // 表示でも空セルで幅を保持し、ロール差でレイアウトが変わらないように
+              // する(セレクト列も同様)。仮想化で各行は absolute 配置になるため、
+              // グリッド定義は行要素側に残す。
               style={{
                 position: "absolute",
                 top: 0,
@@ -145,8 +155,24 @@ export function TicketList({
                 height: virtualRow.size,
                 transform: `translateY(${virtualRow.start}px)`,
               }}
-              className="grid h-12 grid-cols-[3.5rem_minmax(0,1fr)_9rem_5.5rem_7.5rem_5rem_3rem_8.5rem] items-center gap-3 rounded-lg border border-border bg-card px-4 transition-colors hover:bg-surface-2"
+              className="grid h-12 grid-cols-[1.5rem_3.5rem_minmax(0,1fr)_9rem_5.5rem_7.5rem_5rem_3rem_8.5rem] items-center gap-3 rounded-lg border border-border bg-card px-4 transition-colors hover:bg-surface-2"
             >
+              {/* Bulk-select checkbox (spec): agent-only, before the SUP-n column.
+                  A raw checkbox rather than a Link so its click never bubbles to
+                  row navigation; customer / non-selectable rows keep an empty span
+                  so the column width holds. */}
+              {selectable ? (
+                <input
+                  type="checkbox"
+                  data-testid="ticket-select"
+                  aria-label={`Select ${ticket.subject}`}
+                  checked={selectedIds?.has(ticket.id) ?? false}
+                  onChange={() => onToggleSelect?.(ticket.id)}
+                  className="size-4 shrink-0 accent-primary"
+                />
+              ) : (
+                <span />
+              )}
               {/* A semantic router Link (renders <a role=link>): keyboard-focusable
                   and it navigates in-app (SPA) rather than a full-document load.
                   Mounting TicketList now requires a router context, so

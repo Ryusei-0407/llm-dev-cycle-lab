@@ -83,8 +83,8 @@ body: {"json":{"ids":["<uuid1>","<uuid2>"],"patch":{"status":"in_progress"}}}
      直 POST → FORBIDDEN
 - タグ: `@feature-bulk-actions`。feature-map.json に登録:
   `"bulk-actions": ["apps/api/src/tickets/store.ts", "apps/api/src/tickets/router.ts",
-  "apps/api/src/tickets/schema.ts", "apps/web/src/components/ticket-list.tsx",
-  "apps/web/src/routes/tickets.tsx", "e2e/tests/bulk-actions.spec.ts"]`
+"apps/api/src/tickets/schema.ts", "apps/web/src/components/ticket-list.tsx",
+"apps/web/src/routes/tickets.tsx", "e2e/tests/bulk-actions.spec.ts"]`
 
 ## 実装メモ(制約)
 

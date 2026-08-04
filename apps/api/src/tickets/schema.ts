@@ -63,6 +63,24 @@ export const listPageInput = z.object({
   unresolved: z.boolean().optional(),
 });
 
+// bulk-actions (spec: specs/bulk-actions.md). A 1..50 batch of uuid ids plus a
+// partial patch; the patch must carry at least one key (.refine), so an empty
+// object rejects at this boundary. assigneeEmail null unassigns; the "is it an
+// agent" check stays a store DB lookup, mirroring setAssignee. status/priority
+// reuse the shared enums.
+export const bulkUpdateInput = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(50),
+  patch: z
+    .object({
+      status: statusSchema.optional(),
+      priority: prioritySchema.optional(),
+      assigneeEmail: z.string().email().nullable().optional(),
+    })
+    .refine((patch) => Object.keys(patch).length > 0, {
+      message: "patch must set at least one field",
+    }),
+});
+
 // command-palette search (spec: specs/command-palette.md). q is trimmed then
 // bounded to 1..100 chars, so a whitespace-only query rejects as empty. The
 // number-vs-subject decision lives in the store, not zod.
@@ -109,3 +127,4 @@ export type SetAssigneeInput = z.infer<typeof setAssigneeInput>;
 export type SetLabelsInput = z.infer<typeof setLabelsInput>;
 export type ListPageInput = z.infer<typeof listPageInput>;
 export type SearchInput = z.infer<typeof searchInput>;
+export type BulkUpdateInput = z.infer<typeof bulkUpdateInput>;
