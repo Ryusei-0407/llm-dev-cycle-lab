@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
+import type { RealtimeEvent, RealtimeHub } from "../src/realtime.js";
 import { applySchemaAndSeed } from "../../../scripts/test-db.mjs";
 
 // saved-views router surface (spec: specs/saved-views.md サーバー / router観点).
@@ -331,6 +332,91 @@ describe("saved-views: views* はエージェント専用 (HTTP面) @feature-sav
       expect(res.status).toBe(404);
       const err = unwrap(await res.json()) as { code?: string };
       expect(err.code).toBe("NOT_FOUND");
+    },
+  );
+  it(
+    "反証固定: filters.label の 1..32 境界 — 空文字と33文字は BAD_REQUEST",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "敵対的レビューの反証固定: label の長さ制約(1..32)を外しても全テストが素通りし、不正データが jsonb に黙って永続した。空文字 label と 33 文字 label の viewsCreate がともに 400 BAD_REQUEST で拒否されることを検証",
+      },
+    },
+    async () => {
+      const app = createApp();
+      const cookie = await cookieFor(app, SEED.agent);
+      for (const label of ["", "x".repeat(33)]) {
+        const res = await rpc(
+          app,
+          "viewsCreate",
+          { name: `L境界 ${label.length}`, filters: { label } },
+          cookie,
+        );
+        expect(res.status).toBe(400);
+        const err = unwrap(await res.json()) as { code?: string };
+        expect(err.code).toBe("BAD_REQUEST");
+      }
+    },
+  );
+
+  it(
+    "反証固定: name の 32 上限 — 33文字は BAD_REQUEST",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "敵対的レビューの反証固定: name の .max(32) を外しても全テストが素通りした(DB CHECK に落ちるとマップされない 500 になり契約が変わる)。33 文字の name が zod 層で 400 BAD_REQUEST になることを検証",
+      },
+    },
+    async () => {
+      const app = createApp();
+      const cookie = await cookieFor(app, SEED.agent);
+      const res = await rpc(
+        app,
+        "viewsCreate",
+        { name: "x".repeat(33), filters: { status: "open" } },
+        cookie,
+      );
+      expect(res.status).toBe(400);
+      const err = unwrap(await res.json()) as { code?: string };
+      expect(err.code).toBe("BAD_REQUEST");
+    },
+  );
+
+  it(
+    "反証固定: views* は realtime broadcast を一切行わない",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "敵対的レビューの反証固定: viewsCreate に broadcast を仕込んでも全テストが素通りした(個人設定の保存が全クライアントに再取得を誘発しても検知不能)。録音 hub を注入し、viewsCreate → viewsList → viewsDelete の往復で hub にイベントが1件も流れないことを検証",
+      },
+    },
+    async () => {
+      const events: RealtimeEvent[] = [];
+      const hub: RealtimeHub = {
+        register() {},
+        broadcast(event) {
+          events.push(event);
+        },
+        size: () => 0,
+      };
+      const app = createApp({ hub });
+      const cookie = await cookieFor(app, SEED.agent);
+
+      const created = await rpc(
+        app,
+        "viewsCreate",
+        { name: "配信しないビュー", filters: { status: "open" } },
+        cookie,
+      );
+      expect(created.status).toBe(200);
+      const view = unwrap(await created.json()) as { id: string };
+      const deleted = await rpc(app, "viewsDelete", { id: view.id }, cookie);
+      expect(deleted.status).toBe(200);
+
+      expect(events).toEqual([]);
     },
   );
 });
