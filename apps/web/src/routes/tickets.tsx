@@ -149,6 +149,48 @@ function TicketsPage() {
     orpc.tickets.setStatus.mutationOptions({ onSuccess: invalidateList }),
   );
 
+  // saved-views (spec: specs/saved-views.md): name the current filter combo and
+  // persist it. The inline input opens from the "ビューとして保存" button; on
+  // success it invalidates viewsList so the sidebar list (which reads the same
+  // key) refreshes immediately. A blank name is caught client-side; a CONFLICT
+  // from the server maps to the same alert region.
+  const [showSaveView, setShowSaveView] = useState(false);
+  const [viewName, setViewName] = useState("");
+  const [viewError, setViewError] = useState<string | null>(null);
+  const saveViewMutation = useMutation(
+    orpc.tickets.viewsCreate.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: orpc.tickets.viewsList.key() });
+        setViewName("");
+        setViewError(null);
+        setShowSaveView(false);
+      },
+      onError: (err) => {
+        setViewError(
+          (err as { code?: string }).code === "CONFLICT"
+            ? "同名のビューがあります"
+            : "ビューを保存できませんでした",
+        );
+      },
+    }),
+  );
+
+  const onSaveView = () => {
+    const trimmed = viewName.trim();
+    if (trimmed.length === 0) {
+      setViewError("ビュー名を入力してください");
+      return;
+    }
+    // Only the active filters ride the payload — the server's strict schema wants
+    // just the keys the user set, and at least one is present (hasFilter gated the
+    // button).
+    const filters: TicketSearch = {};
+    if (search.status) filters.status = search.status;
+    if (search.priority) filters.priority = search.priority;
+    if (search.label) filters.label = search.label;
+    saveViewMutation.mutate({ name: trimmed, filters });
+  };
+
   const [showForm, setShowForm] = useState(false);
   const [subject, setSubject] = useState("");
   const [priority, setPriority] = useState<TicketPriority>("medium");
@@ -302,7 +344,57 @@ function TicketsPage() {
             クリア
           </Button>
         )}
+        {/* saved-views (spec: specs/saved-views.md): agent-only, and only when at
+            least one filter is active. The save button flips to an inline name
+            input + confirm; Enter confirms too. */}
+        {isAgent && hasFilter && !showSaveView && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="view-save"
+            onClick={() => {
+              setViewError(null);
+              setShowSaveView(true);
+            }}
+          >
+            ビューとして保存
+          </Button>
+        )}
+        {isAgent && hasFilter && showSaveView && (
+          <div className="flex items-center gap-2">
+            <Input
+              data-testid="view-name-input"
+              aria-label="ビュー名"
+              placeholder="ビュー名"
+              value={viewName}
+              onChange={(e) => setViewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onSaveView();
+                }
+              }}
+              className="h-8 w-40"
+            />
+            <Button
+              type="button"
+              size="sm"
+              data-testid="view-save-confirm"
+              disabled={saveViewMutation.isPending}
+              onClick={onSaveView}
+            >
+              保存
+            </Button>
+          </div>
+        )}
       </div>
+
+      {viewError && (
+        <p data-testid="view-error" role="alert" className="text-sm text-destructive">
+          {viewError}
+        </p>
+      )}
 
       {listQuery.isError ? (
         <p data-testid="tickets-load-error" role="alert" className="text-sm text-destructive">

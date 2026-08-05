@@ -13,8 +13,16 @@ import {
   setLabelsInput,
   setPriorityInput,
   setStatusInput,
+  viewsCreateInput,
+  viewsDeleteInput,
 } from "./schema.js";
-import { BadRequestError, createTicketStore, NotFoundError, type TicketStore } from "./store.js";
+import {
+  BadRequestError,
+  ConflictError,
+  createTicketStore,
+  NotFoundError,
+  type TicketStore,
+} from "./store.js";
 
 // Per-request context injected at the /api/rpc mount (app.ts injects
 // resolveUser(c)): the resolved session user, or null when the request carries
@@ -69,6 +77,17 @@ export function getMessageStore(): MessageStore {
 function requireUser(user: User | null): User {
   if (!user) throw new ORPCError("UNAUTHORIZED", { message: "not authenticated" });
   return user;
+}
+
+// Session-required + agent role in one step (spec: saved-views, agent 専用). A
+// null session is UNAUTHORIZED (before the role check, so an unauthenticated
+// customer path can't be inferred), a customer is FORBIDDEN.
+function requireAgent(user: User | null): User {
+  const resolved = requireUser(user);
+  if (resolved.role !== "agent") {
+    throw new ORPCError("FORBIDDEN", { message: "agent only" });
+  }
+  return resolved;
 }
 
 // get/reply share existence → ownership ordering: a missing ticket is NOT_FOUND
@@ -261,6 +280,50 @@ export function createTicketsRouter(hub: RealtimeHub) {
         throw new ORPCError("FORBIDDEN", { message: "agent only" });
       }
       return getStore().insights();
+    }),
+
+    // saved-views (spec: specs/saved-views.md). All three are session-required +
+    // agent-only (a customer is FORBIDDEN, mirroring agents/insights) and never
+    // broadcast — a saved view is personal config, not ticket data. Scope is the
+    // session email, never client input, so an agent only ever sees or touches
+    // their own views.
+    viewsList: base.handler(({ context }) => {
+      const user = requireAgent(context.user);
+      return getStore().listViews(user.email);
+    }),
+
+    // A same-name save within the user's own scope is CONFLICT (the store maps
+    // the UNIQUE violation to ConflictError); zod already rejected a blank name
+    // and an empty/unknown-key filters object at the input boundary.
+    viewsCreate: base.input(viewsCreateInput).handler(async ({ input, context }) => {
+      const user = requireAgent(context.user);
+      try {
+        return await getStore().createView({
+          userEmail: user.email,
+          name: input.name,
+          filters: input.filters,
+        });
+      } catch (err) {
+        if (err instanceof ConflictError) {
+          throw new ORPCError("CONFLICT", { message: "view name already exists" });
+        }
+        throw err;
+      }
+    }),
+
+    // Delete is scoped to the caller's own views; another user's id (present or
+    // not) is NOT_FOUND from the store, so existence never leaks (spec).
+    viewsDelete: base.input(viewsDeleteInput).handler(async ({ input, context }) => {
+      const user = requireAgent(context.user);
+      try {
+        await getStore().deleteView(user.email, input.id);
+        return { ok: true as const };
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ORPCError("NOT_FOUND", { message: "view not found" });
+        }
+        throw err;
+      }
     }),
 
     // Ticket detail: the ticket, its thread, and its activity log. Existence →

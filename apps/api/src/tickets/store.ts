@@ -68,12 +68,39 @@ export type CreateTicketInput = {
   requesterEmail: string;
 };
 
+// saved-views (spec: specs/saved-views.md). A named filter combination scoped to
+// one agent. filters carries only the keys the user set (status/priority/label);
+// it is persisted as jsonb and read back verbatim, so the roundtrip is byte-for-
+// byte the wire shape. created_at/id are DB-stamped and never leave the store.
+export type SavedViewFilters = {
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  label?: string;
+};
+export type SavedView = { id: string; name: string; filters: SavedViewFilters };
+export type CreateViewInput = {
+  userEmail: string;
+  name: string;
+  filters: SavedViewFilters;
+};
+
 // Thrown by mutations when no row matches the id, so the router can map it to an
 // oRPC NOT_FOUND without string-matching an error message.
 export class NotFoundError extends Error {
   constructor(id: string) {
     super(`NOT_FOUND: ticket ${id}`);
     this.name = "NotFoundError";
+  }
+}
+
+// Thrown by createView on a same-name save within one user's scope (spec:
+// saved-views). The store detects the UNIQUE (user_email, name) violation and
+// raises this so the router maps it to an oRPC CONFLICT without SQLSTATE-matching
+// at the router layer.
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConflictError";
   }
 }
 
@@ -678,8 +705,68 @@ export function createTicketStore(pool: Pool) {
 
       return { byStatus, byPriority, unassigned, byLabel, resolvedByDay };
     },
+
+    // saved-views (spec: specs/saved-views.md). A user's own saved views,
+    // creation order (created_at ASC, id ASC — v7 ids already sort this way, but
+    // the explicit tie-break keeps it stable). The router scopes userEmail to the
+    // session; the store just filters.
+    async listViews(userEmail: string): Promise<SavedView[]> {
+      const { rows } = await pool.query<ViewRow>(
+        `SELECT id, name, filters FROM user_views
+          WHERE user_email = $1 ORDER BY created_at ASC, id ASC`,
+        [userEmail],
+      );
+      return rows.map(toSavedView);
+    },
+
+    // Insert one view for a user; the same name within that user's scope trips
+    // the UNIQUE (user_email, name) constraint, which we translate to a
+    // ConflictError for the router. filters is stored as jsonb verbatim.
+    async createView({ userEmail, name, filters }: CreateViewInput): Promise<SavedView> {
+      try {
+        const { rows } = await pool.query<ViewRow>(
+          `INSERT INTO user_views (user_email, name, filters)
+           VALUES ($1, $2, $3)
+           RETURNING id, name, filters`,
+          [userEmail, name, JSON.stringify(filters)],
+        );
+        return toSavedView(rows[0]);
+      } catch (err) {
+        if (err instanceof Error && (err as { code?: string }).code === UNIQUE_VIOLATION) {
+          throw new ConflictError("view name already exists");
+        }
+        throw err;
+      }
+    },
+
+    // Delete one of the user's own views. The user_email predicate is part of the
+    // match, so another user's id (even a real one) deletes nothing and surfaces
+    // as NotFoundError — the same response an absent id gets, so existence never
+    // leaks (spec: 存在の漏えい防止).
+    async deleteView(userEmail: string, id: string): Promise<void> {
+      const { rowCount } = await pool.query(
+        `DELETE FROM user_views WHERE id = $1 AND user_email = $2`,
+        [id, userEmail],
+      );
+      if (!rowCount) throw new NotFoundError(id);
+    },
   };
 }
+
+// user_views row: filters is pg jsonb, already parsed to the wire object, so the
+// mapper just renames columns — no JSON.parse (node-postgres decodes jsonb).
+type ViewRow = {
+  id: string;
+  name: string;
+  filters: SavedViewFilters;
+};
+
+function toSavedView(row: ViewRow): SavedView {
+  return { id: row.id, name: row.name, filters: row.filters };
+}
+
+// pg SQLSTATE for a unique_violation — createView maps it to ConflictError.
+const UNIQUE_VIOLATION = "23505";
 
 type EventRow = {
   id: string;

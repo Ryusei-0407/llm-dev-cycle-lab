@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { User } from "@/auth/api";
@@ -69,6 +69,23 @@ export function AppShell({ user, children }: { user: User; children: React.React
     retry: false,
   });
   const inboxCount = inboxCountQuery.data ?? 0;
+
+  // saved-views (spec: specs/saved-views.md): the agent's own saved filter combos,
+  // listed under the two presets. Agent-only, same enabled guard as inboxCount so
+  // a customer never calls the agent-only procedure. Delete removes the view and
+  // invalidates the list (which /tickets also writes on create).
+  const queryClient = useQueryClient();
+  const viewsQuery = useQuery({
+    ...orpc.tickets.viewsList.queryOptions(),
+    enabled: isAgent,
+    retry: false,
+  });
+  const savedViews = viewsQuery.data ?? [];
+  const deleteViewMutation = useMutation(
+    orpc.tickets.viewsDelete.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.tickets.viewsList.key() }),
+    }),
+  );
 
   const onSignOut = async () => {
     await logout();
@@ -174,6 +191,31 @@ export function AppShell({ user, children }: { user: User; children: React.React
               <span aria-hidden="true" className="size-[7px] rounded-full bg-warn" />
               未対応のみ
             </Link>
+            {/* The agent's saved views (spec: saved-views), directly under the two
+                presets. Each is a Link carrying only the filter keys it stored,
+                plus an inline delete that removes it immediately (no confirm). */}
+            {savedViews.map((view) => (
+              <div key={view.id} className={`${navItemClass} group`}>
+                <Link
+                  data-testid="sidebar-user-view"
+                  to="/tickets"
+                  search={view.filters}
+                  className="flex flex-1 items-center gap-2"
+                >
+                  <span aria-hidden="true" className="size-[7px] rounded-full bg-[var(--brand)]" />
+                  {view.name}
+                </Link>
+                <button
+                  type="button"
+                  data-testid="sidebar-user-view-delete"
+                  aria-label={`Delete view ${view.name}`}
+                  onClick={() => deleteViewMutation.mutate({ id: view.id })}
+                  className="ml-auto text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                >
+                  <DeleteIcon />
+                </button>
+              </div>
+            ))}
           </>
         )}
         <div className="mt-auto flex flex-col gap-2 px-1 pt-2">
@@ -272,6 +314,14 @@ function ChartIcon() {
   return (
     <svg {...iconProps}>
       <path d="M2.5 13V8.5m5 4.5V5.5m5 7.5V3" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg {...iconProps} width={12} height={12}>
+      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
