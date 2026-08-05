@@ -46,7 +46,10 @@ export const test = base.extend<
       await use(stack);
       await stack.stop();
     },
-    { scope: "worker", auto: true },
+    // スタック起動(コンテナ+api+vite)はコールドスタート同士が並ぶと 30s の
+    // 既定 fixture タイムアウトを超えることがある(worker 数ぶんの vite が同時に
+    // 立つ初回)。起動は worker 毎に1回きりなので余裕を持たせる。
+    { scope: "worker", auto: true, timeout: 120_000 },
   ],
   baseURL: async ({ workerStack }, use) => {
     await use(workerStack.webURL);
