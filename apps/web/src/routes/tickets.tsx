@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { fetchMe } from "@/auth/api";
 import { AppShell } from "@/components/app-shell";
 import { TicketList } from "@/components/ticket-list";
+import { isEditableTarget, nextActiveIndex } from "@/lib/list-keys";
 import { useSessionUser } from "@/lib/session";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets";
 import { Button } from "@/components/ui/button";
@@ -138,6 +139,51 @@ function TicketsPage() {
   // Flatten loaded pages into the display list; server order (created_at DESC)
   // is preserved — no client re-sort (spec).
   const tickets = listQuery.data?.pages.flatMap((page) => page.items) ?? [];
+
+  // Keyboard navigation (spec: specs/keyboard-nav.md). The active row index
+  // lives here (route) and is handed to TicketList as a prop; null = 未選択.
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  // Clamp the active index into the loaded range when the row set changes
+  // (filter change / re-fetch). 行数が減って範囲外になったら末尾へ。0件は据え置き:
+  // クエリ切替中は一時的に 0 件を経由するため、ここで null に落とすと
+  // 「クランプ」ではなく「リセット」になる。0件表示中は data-active な行が
+  // 存在せず、Enter/o も !ticket ガードで無反応 — 次のデータ到着時にクランプされる。
+  const ticketCount = tickets.length;
+  useEffect(() => {
+    setActiveIndex((current) => {
+      if (current === null || ticketCount === 0) return current;
+      return Math.min(current, ticketCount - 1);
+    });
+  }, [ticketCount]);
+
+  // document keydown for list navigation (spec): j/↓ 次へ、k/↑ 前へ、Enter/o で
+  // アクティブ行の詳細へ SPA 遷移。修飾キー付き・入力系フォーカス中・パレット表示中は
+  // 何もしない(⌘K/⌘/ の既存ショートカットとは修飾なし単键で棲み分け)。パレットは
+  // AppShell ローカル state なので、開いている間だけ DOM に出る popup で検出する。
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isEditableTarget(e.target)) return;
+      if (document.querySelector('[data-testid="command-palette"]')) return;
+
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIndex((current) => nextActiveIndex(current, 1, tickets.length));
+      } else if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIndex((current) => nextActiveIndex(current, -1, tickets.length));
+      } else if (e.key === "Enter" || e.key === "o") {
+        if (activeIndex === null) return;
+        const ticket = tickets[activeIndex];
+        if (!ticket) return;
+        e.preventDefault();
+        void navigate({ to: "/tickets/$id", params: { id: ticket.id } });
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [tickets, activeIndex, navigate]);
 
   const invalidateList = () =>
     queryClient.invalidateQueries({ queryKey: orpc.tickets.listPage.key() });
@@ -471,6 +517,7 @@ function TicketsPage() {
             onToggleSelect={toggleSelect}
             onEndReached={onEndReached}
             height={listHeight || undefined}
+            activeIndex={activeIndex}
           />
         </div>
       )}
