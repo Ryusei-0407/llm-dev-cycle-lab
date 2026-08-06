@@ -4,6 +4,7 @@ import { createPool } from "../db.js";
 import { createRealtimeHub, type RealtimeHub } from "../realtime.js";
 import { createMessageStore, type MessageStore } from "./messages.js";
 import {
+  bulkUpdateInput,
   createInput,
   getInput,
   listPageInput,
@@ -219,6 +220,35 @@ export function createTicketsRouter(hub: RealtimeHub) {
       return agentMutation(context.user, input.id, () =>
         getStore().setLabels(input.id, input.labels, user.email),
       );
+    }),
+
+    // bulk-actions (spec: specs/bulk-actions.md). Agent-only — a customer is
+    // FORBIDDEN, an unauthenticated caller UNAUTHORIZED. The store applies the
+    // batch in one transaction (any missing id → NOT_FOUND rollback; a bad
+    // assignee target → BAD_REQUEST) and reports the ids that really changed;
+    // one ticket.updated is broadcast per changed ticket (no-op ids do not
+    // broadcast). Returns { updated } — the count that actually changed.
+    bulkUpdate: base.input(bulkUpdateInput).handler(async ({ input, context }) => {
+      const user = requireUser(context.user);
+      if (user.role !== "agent") {
+        throw new ORPCError("FORBIDDEN", { message: "agent only" });
+      }
+      let result: { updated: number; changedIds: string[] };
+      try {
+        result = await getStore().bulkUpdate(input.ids, input.patch, user.email);
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ORPCError("NOT_FOUND", { message: "ticket not found" });
+        }
+        if (err instanceof BadRequestError) {
+          throw new ORPCError("BAD_REQUEST", { message: err.message });
+        }
+        throw err;
+      }
+      for (const ticketId of result.changedIds) {
+        hub.broadcast({ type: "ticket.updated", ticketId });
+      }
+      return { updated: result.updated };
     }),
 
     // Label catalogue for the toggles. Session required, role-agnostic (spec).

@@ -191,6 +191,66 @@ function TicketsPage() {
     saveViewMutation.mutate({ name: trimmed, filters });
   };
 
+  // bulk-actions (spec: specs/bulk-actions.md). Selection + the bar's three
+  // pending patch fields live here; the checkbox column and the bar are agent-
+  // only. Empty select value means "leave as is"; the assignee "unassign"
+  // sentinel maps to null.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkStatus, setBulkStatus] = useState<TicketStatus | "">("");
+  const [bulkPriority, setBulkPriority] = useState<TicketPriority | "">("");
+  const [bulkAssignee, setBulkAssignee] = useState<string>("");
+  const [bulkError, setBulkError] = useState(false);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setBulkStatus("");
+    setBulkPriority("");
+    setBulkAssignee("");
+    setBulkError(false);
+  };
+
+  // Agent directory for the assignee select (spec: 既存 tickets.agents の結果).
+  // Agent-only, mirroring the detail panel's gating.
+  const agentsQuery = useQuery({
+    ...orpc.tickets.agents.queryOptions(),
+    enabled: isAgent,
+    retry: false,
+  });
+
+  const bulkUpdateMutation = useMutation(orpc.tickets.bulkUpdate.mutationOptions());
+
+  const onBulkApply = () => {
+    const patch: {
+      status?: TicketStatus;
+      priority?: TicketPriority;
+      assigneeEmail?: string | null;
+    } = {};
+    if (bulkStatus) patch.status = bulkStatus;
+    if (bulkPriority) patch.priority = bulkPriority;
+    if (bulkAssignee) patch.assigneeEmail = bulkAssignee === "unassign" ? null : bulkAssignee;
+    setBulkError(false);
+    bulkUpdateMutation.mutate(
+      { ids: [...selectedIds], patch },
+      {
+        onSuccess: () => {
+          invalidateList();
+          clearSelection();
+        },
+        // 選択状態は維持しリトライ可能にする(spec)。
+        onError: () => setBulkError(true),
+      },
+    );
+  };
+
   const [showForm, setShowForm] = useState(false);
   const [subject, setSubject] = useState("");
   const [priority, setPriority] = useState<TicketPriority>("medium");
@@ -406,9 +466,94 @@ function TicketsPage() {
             tickets={tickets}
             onStatusChange={onStatusChange}
             showStatusControl={isAgent}
+            selectable={isAgent}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
             onEndReached={onEndReached}
             height={listHeight || undefined}
           />
+        </div>
+      )}
+
+      {/* 一括アクションバー (spec: specs/bulk-actions.md). 選択件数 > 0 のとき
+          一覧下部に表示。どのセレクトも空なら適用は disabled。適用失敗時は
+          bulk-error を出し選択は維持。 */}
+      {isAgent && selectedIds.size > 0 && (
+        <div
+          data-testid="bulk-bar"
+          className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3"
+        >
+          <span data-testid="bulk-count" className="text-sm text-foreground">
+            {selectedIds.size}件選択
+          </span>
+          <select
+            data-testid="bulk-status-select"
+            aria-label="一括で status を変更"
+            value={bulkStatus}
+            onChange={(e) => setBulkStatus(e.target.value as TicketStatus | "")}
+            className={FILTER_SELECT_CLASS}
+          >
+            <option value="">Status</option>
+            {STATUS_FILTER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select
+            data-testid="bulk-priority-select"
+            aria-label="一括で priority を変更"
+            value={bulkPriority}
+            onChange={(e) => setBulkPriority(e.target.value as TicketPriority | "")}
+            className={FILTER_SELECT_CLASS}
+          >
+            <option value="">Priority</option>
+            {PRIORITY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select
+            data-testid="bulk-assignee-select"
+            aria-label="一括で担当者を変更"
+            value={bulkAssignee}
+            onChange={(e) => setBulkAssignee(e.target.value)}
+            className={FILTER_SELECT_CLASS}
+          >
+            <option value="">Assignee</option>
+            <option value="unassign">担当解除</option>
+            {(agentsQuery.data ?? []).map((agent) => (
+              <option key={agent.email} value={agent.email}>
+                {agent.name}
+              </option>
+            ))}
+          </select>
+          <Button
+            type="button"
+            size="sm"
+            data-testid="bulk-apply"
+            disabled={
+              (!bulkStatus && !bulkPriority && !bulkAssignee) || bulkUpdateMutation.isPending
+            }
+            onClick={onBulkApply}
+          >
+            適用
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="bulk-clear"
+            onClick={clearSelection}
+          >
+            選択解除
+          </Button>
+          {bulkError && (
+            <p data-testid="bulk-error" role="alert" className="text-sm text-destructive">
+              一括更新に失敗しました。
+            </p>
+          )}
         </div>
       )}
     </main>

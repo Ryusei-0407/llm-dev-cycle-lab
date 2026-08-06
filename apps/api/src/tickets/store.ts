@@ -210,6 +210,15 @@ export type ListPageArgs = {
 
 export type AgentRef = { email: string; name: string };
 
+// bulk-actions patch (spec: specs/bulk-actions.md). An undefined field is "leave
+// as is"; assigneeEmail explicitly null unassigns. The router derives this from
+// the zod-validated input, so at least one key is always present.
+export type BulkPatch = {
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  assigneeEmail?: string | null;
+};
+
 // copilot support snapshot (spec: specs/copilot.md). The numbers the LLM is
 // allowed to cite come only from this SQL aggregate — the model never counts.
 export type CopilotSnapshot = {
@@ -515,6 +524,78 @@ export function createTicketStore(pool: Pool) {
         const updated = await loadByIdOn(client, id);
         if (!updated) throw new NotFoundError(id);
         return updated;
+      });
+    },
+
+    // Batch status/priority/assignee change across many tickets in one
+    // transaction (spec: specs/bulk-actions.md). Semantics mirror the single
+    // mutations, shared here rather than duplicated: per field, a same-value
+    // ticket is a no-op (no event, no updated_at bump); a real change writes the
+    // matching *_changed event and bumps updated_at. A ticket counts as changed
+    // if any field actually moved. If any id is missing the whole batch rolls
+    // back with NotFoundError (no partial apply). assigneeEmail must be null or
+    // an existing role='agent' email — otherwise BadRequestError, same as
+    // setAssignee. Returns the ids that really changed so the router broadcasts
+    // one ticket.updated per changed ticket (no-op ids are not broadcast).
+    async bulkUpdate(
+      ids: string[],
+      patch: BulkPatch,
+      actorEmail = "system",
+    ): Promise<{ updated: number; changedIds: string[] }> {
+      // Validate the assignee target once up front, before the transaction, so a
+      // bad target rejects without touching any row (same lookup as setAssignee).
+      if (patch.assigneeEmail !== undefined && patch.assigneeEmail !== null) {
+        const { rows } = await pool.query<{ email: string }>(
+          `SELECT email FROM users WHERE email = $1 AND role = 'agent'`,
+          [patch.assigneeEmail],
+        );
+        if (rows.length === 0) throw new BadRequestError("not an agent");
+      }
+      return withTransaction(pool, async (client) => {
+        const changedIds: string[] = [];
+        for (const id of ids) {
+          const current = await loadByIdOn(client, id);
+          if (!current) throw new NotFoundError(id);
+          let changed = false;
+          if (patch.status !== undefined && current.status !== patch.status) {
+            await client.query(`UPDATE tickets SET status = $2 WHERE id = $1`, [id, patch.status]);
+            await insertEvent(client, id, actorEmail, "status_changed", {
+              from: current.status,
+              to: patch.status,
+            });
+            changed = true;
+          }
+          if (patch.priority !== undefined && current.priority !== patch.priority) {
+            await client.query(`UPDATE tickets SET priority = $2 WHERE id = $1`, [
+              id,
+              patch.priority,
+            ]);
+            await insertEvent(client, id, actorEmail, "priority_changed", {
+              from: current.priority,
+              to: patch.priority,
+            });
+            changed = true;
+          }
+          if (patch.assigneeEmail !== undefined && current.assigneeEmail !== patch.assigneeEmail) {
+            await client.query(`UPDATE tickets SET assignee_email = $2 WHERE id = $1`, [
+              id,
+              patch.assigneeEmail,
+            ]);
+            await insertEvent(client, id, actorEmail, "assignee_changed", {
+              from: current.assigneeEmail,
+              to: patch.assigneeEmail,
+            });
+            changed = true;
+          }
+          // A single updated_at bump per changed ticket regardless of how many
+          // fields moved (the events above already record each change). A no-op
+          // ticket keeps its updated_at, matching the single mutations.
+          if (changed) {
+            await client.query(`UPDATE tickets SET updated_at = now() WHERE id = $1`, [id]);
+            changedIds.push(id);
+          }
+        }
+        return { updated: changedIds.length, changedIds };
       });
     },
 

@@ -153,5 +153,13 @@
     "apps/web/src/routes/tickets.tsx",
     "e2e/tests/saved-views.spec.ts"
   ],
-  "evals": ["apps/api/evals/**"]
+  "evals": ["apps/api/evals/**"],
+  "bulk-actions": [
+    "apps/api/src/tickets/store.ts",
+    "apps/api/src/tickets/router.ts",
+    "apps/api/src/tickets/schema.ts",
+    "apps/web/src/components/ticket-list.tsx",
+    "apps/web/src/routes/tickets.tsx",
+    "e2e/tests/bulk-actions.spec.ts"
+  ]
 }
