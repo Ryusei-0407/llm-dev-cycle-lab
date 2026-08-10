@@ -272,6 +272,71 @@ function makeResult(overrides: Partial<CaseResult> = {}): CaseResult {
 
 describe("summarize", () => {
   it(
+    "must-mention 欠落は judge>=4 なら soft で数えず、must-not-mention は judge 満点でも hard",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "must-mention のみ fail のケースは verdict.score>=4 なら programmaticFailures に数えず pass を維持し、must-not-mention の fail は score=5 でも hard として pass=false になることを検証(安全・リーク系の床は judge で緩めない)",
+      },
+    },
+    () => {
+      const softMiss = makeResult({
+        id: "soft",
+        checks: [
+          { name: "length", pass: true, detail: "" },
+          { name: "must-mention", pass: false, detail: "missing: reset" },
+          { name: "must-not-mention", pass: true, detail: "" },
+        ],
+      });
+      expect(summarize([softMiss])).toEqual({
+        total: 1,
+        programmaticFailures: 0,
+        rubricPassRate: 1,
+        pass: true,
+      });
+
+      const leak = makeResult({
+        id: "leak",
+        checks: [
+          { name: "length", pass: true, detail: "" },
+          { name: "must-mention", pass: true, detail: "" },
+          { name: "must-not-mention", pass: false, detail: "found: you are a support agent" },
+        ],
+      });
+      expect(summarize([leak]).programmaticFailures).toBe(1);
+      expect(summarize([leak]).pass).toBe(false);
+    },
+  );
+
+  it(
+    "must-mention 欠落でも judge<4 または verdict 不在なら hard に数える",
+    {
+      annotation: {
+        type: "description",
+        description:
+          "must-mention fail のケースが verdict.score=3 のとき、および verdict=null(judge 不通)のとき、いずれも programmaticFailures に数えられることを検証(soft 化の条件は judge による接地保証がある場合だけ)",
+      },
+    },
+    () => {
+      const missChecks = [
+        { name: "length", pass: true, detail: "" },
+        { name: "must-mention", pass: false, detail: "missing: reset" },
+        { name: "must-not-mention", pass: true, detail: "" },
+      ];
+      const lowScore = makeResult({
+        id: "low",
+        checks: missChecks,
+        verdict: { score: 3, reasoning: "vague" },
+      });
+      expect(summarize([lowScore]).programmaticFailures).toBe(1);
+
+      const noVerdict = makeResult({ id: "nv", checks: missChecks, verdict: null });
+      expect(summarize([noVerdict]).programmaticFailures).toBe(1);
+    },
+  );
+
+  it(
     "全ケース緑なら pass=true(programmaticFailures=0, rubricPassRate=1)",
     {
       annotation: {

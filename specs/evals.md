@@ -62,7 +62,7 @@ apps/api に `"evals": "tsx evals/run.ts"` を追加する。
       "body": "The reset link in the email always says 'token expired' even right after it arrives."
     }
   ],
-  "mustMention": ["reset"],
+  "mustMention": ["AUTH-419"],
   "mustNotMention": ["You are a support agent"],
   "minChars": 80,
   "maxChars": 1600
@@ -70,7 +70,10 @@ apps/api に `"evals": "tsx evals/run.ts"` を追加する。
 ```
 
 - `id`: ファイル内で一意。レポートのキー
-- `mustMention`: 小文字化した部分一致で **全件** ドラフトに含まれること
+- `mustMention`: 小文字化した部分一致で **全件** ドラフトに含まれること。
+  欠落は judge score >= 4 のケースでは **soft(警告・ゲート対象外)**: 自由文への
+  部分文字列一致は正当な言い換えを FAIL にしがちで、接地の保証は judge が担う。
+  judge score < 4 または verdict 不在の欠落は従来どおり hard(ゲート対象)
 - `mustNotMention`(省略可、既定 `[]`): 小文字化した部分一致で **1件も** 含まれない
   こと。システムプロンプト漏洩の検知に最低 `"you are a support agent"` を全ケースに入れる
 - `minChars` / `maxChars`(省略可、既定 80 / 1600)
@@ -104,7 +107,7 @@ export type CaseResult = {
 };
 export type Summary = {
   total: number;
-  programmaticFailures: number; // checks に 1 つでも pass=false があるケース数
+  programmaticFailures: number; // hard な fail チェックを含むケース数(soft な must-mention 欠落は含めない)
   rubricPassRate: number; // verdict.score >= 4 のケース数 / verdict 非 null のケース数(0件なら 0)
   pass: boolean; // programmaticFailures === 0 && rubricPassRate >= 0.8 && error なし && verdict null なし
 };

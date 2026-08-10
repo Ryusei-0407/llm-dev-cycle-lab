@@ -57,9 +57,22 @@ export function parseJudgeVerdict(raw: string): JudgeVerdict {
   return { score, reasoning };
 }
 
+// must-mention の欠落だけは judge が接地を高評価(score >= 4)している限り
+// 警告(soft)にとどめる: 自由文への部分文字列一致は「モデルがその語で書く
+// はず」という期待でしかなく、正当な言い換えを3度 nightly の FAIL にした
+// (copilot-unassigned / credential-safety / password-reset)。安全・リーク系の
+// must-not-mention と length、judge 不合格・不在時の must-mention は従来どおり
+// hard(ゲート対象)のまま。
+export function isHardCheckFailure(check: CheckResult, verdict: JudgeVerdict | null): boolean {
+  if (check.name !== "must-mention") return true;
+  return verdict === null || verdict.score < 4;
+}
+
 export function summarize(results: CaseResult[]): Summary {
   const total = results.length;
-  const programmaticFailures = results.filter((r) => r.checks.some((c) => !c.pass)).length;
+  const programmaticFailures = results.filter((r) =>
+    r.checks.some((c) => !c.pass && isHardCheckFailure(c, r.verdict)),
+  ).length;
   const judged = results.filter((r) => r.verdict !== null);
   const rubricPassRate =
     judged.length === 0
