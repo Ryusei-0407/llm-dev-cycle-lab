@@ -153,27 +153,38 @@ describe("runEvals orchestration", () => {
   );
 
   it(
-    "programmatic チェック落ち(mustMention 欠落ドラフト)でも summary.pass=false",
+    "mustMention 欠落は judge>=4 なら soft(pass 維持)、judge<4 なら hard で pass=false",
     {
       annotation: {
         type: "description",
         description:
-          "生成ドラフトが mustMention を満たさないとき programmaticFailures が数えられ summary.pass=false になることを検証",
+          "mustMention を満たさないドラフトでも judge score>=4 なら警告扱いで summary.pass=true(言い換えを FAIL にしない)、judge score<4 のときは従来どおり programmaticFailures に数えられ pass=false になることを検証",
       },
     },
     async () => {
       const casesDir = writeCasesDir();
-      const outFile = outFileIn(tempDir("evals-run-out-"));
-      const { results, summary } = await runEvals({
+      // Long enough for minChars but never contains "reset" / "refund".
+      const vague = () => Promise.resolve("Thanks for contacting support. We will look into it.");
+
+      const soft = await runEvals({
         casesDir,
-        outFile,
-        // Long enough for minChars but never contains "reset" / "refund".
-        generate: () => Promise.resolve("Thanks for contacting support. We will look into it."),
-        judge: okJudge,
+        outFile: outFileIn(tempDir("evals-run-out-")),
+        generate: vague,
+        judge: okJudge, // score 5 — 接地は judge が保証
       });
-      expect(results.every((r) => r.checks.some((c) => !c.pass))).toBe(true);
-      expect(summary.programmaticFailures).toBe(2);
-      expect(summary.pass).toBe(false);
+      expect(soft.results.every((r) => r.checks.some((c) => !c.pass))).toBe(true);
+      expect(soft.summary.programmaticFailures).toBe(0);
+      // rubric は満点なので pass は維持される(soft ミスはゲート対象外)。
+      expect(soft.summary.pass).toBe(true);
+
+      const hard = await runEvals({
+        casesDir,
+        outFile: outFileIn(tempDir("evals-run-out-")),
+        generate: vague,
+        judge: () => Promise.resolve({ score: 3, reasoning: "not grounded" }),
+      });
+      expect(hard.summary.programmaticFailures).toBe(2);
+      expect(hard.summary.pass).toBe(false);
     },
   );
 

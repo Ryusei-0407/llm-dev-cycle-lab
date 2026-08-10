@@ -5,7 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 import { buildDraftMessages, buildDraftSystemPrompt } from "../src/tickets/draft.js";
 import { loadCases } from "./cases.js";
 import { buildJudgePrompt, type JudgeFn, realJudge } from "./judge.js";
-import { runProgrammaticChecks, summarize } from "./scoring.js";
+import { isHardCheckFailure, runProgrammaticChecks, summarize } from "./scoring.js";
 import type { CaseResult, EvalCase, Summary } from "./types.js";
 
 export type GenerateFn = (evalCase: EvalCase) => Promise<string>;
@@ -59,8 +59,14 @@ function draftPreview(result: CaseResult): string {
 
 export function renderMarkdown(results: CaseResult[], summary: Summary): string {
   const rows = results.map((r) => {
+    const failing = r.checks.filter((c) => !c.pass);
+    // soft = must-mention の欠落のみで judge が接地を保証しているケース。
+    // ゲートは通るが、言い換え頻発のアンカーに気付けるよう表には残す。
+    const soft = failing.length > 0 && failing.every((c) => !isHardCheckFailure(c, r.verdict));
     const checks =
-      r.error !== null ? "error" : `${r.checks.filter((c) => c.pass).length}/${r.checks.length}`;
+      r.error !== null
+        ? "error"
+        : `${r.checks.filter((c) => c.pass).length}/${r.checks.length}${soft ? " (soft)" : ""}`;
     const score = r.verdict !== null ? String(r.verdict.score) : "-";
     return `| ${r.id} | ${checks} | ${score} | ${draftPreview(r)} |`;
   });
