@@ -80,6 +80,7 @@ export function TicketList({
   onToggleSelect,
   onEndReached,
   height,
+  activeIndex = null,
 }: {
   tickets: Ticket[];
   onStatusChange: (id: string, status: TicketStatus) => void;
@@ -100,6 +101,11 @@ export function TicketList({
   // content, so the visible window spans every row — this is how the component
   // tests (which mount without a height) still render all rows.
   height?: number;
+  // Keyboard-highlighted row (spec: specs/keyboard-nav.md). State lives in the
+  // route and is passed down as a prop; the matching row gets data-active="true"
+  // and, when virtualized off-screen, is scrolled into view. null (default) =
+  // no active row, so the component keeps its prior behavior when unused.
+  activeIndex?: number | null;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -120,6 +126,14 @@ export function TicketList({
     }
   }, [onEndReached, lastIndex, tickets.length]);
 
+  // Keep the active row visible (spec: 可視窓の外に出たらスクロール). The
+  // virtualizer only mounts the visible window, so a keyboard move past the
+  // window edge would otherwise land on a row that isn't in the DOM.
+  useEffect(() => {
+    if (activeIndex == null) return;
+    virtualizer.scrollToIndex(activeIndex);
+  }, [activeIndex, virtualizer]);
+
   return (
     <div
       ref={scrollRef}
@@ -137,10 +151,15 @@ export function TicketList({
       >
         {virtualItems.map((virtualRow) => {
           const ticket = tickets[virtualRow.index];
+          const isActive = virtualRow.index === activeIndex;
           return (
             <li
               key={ticket.id}
               data-testid="ticket-row"
+              // Keyboard-active row (spec: specs/keyboard-nav.md): the highlighted
+              // row carries data-active="true" (absent otherwise) and lifts to
+              // surface-2, the same background the hover state uses.
+              data-active={isActive ? "true" : undefined}
               // 固定幅カラムのグリッド(PC 前提)。flex の内容依存幅だと文字列長で
               // 各カラムの横位置が行ごとに揺れるため、subject 以外は幅を固定して
               // 縦のラインを揃える。先頭は bulk-select 用の列で、customer / 非選択
@@ -155,7 +174,9 @@ export function TicketList({
                 height: virtualRow.size,
                 transform: `translateY(${virtualRow.start}px)`,
               }}
-              className="grid h-12 grid-cols-[1.5rem_3.5rem_minmax(0,1fr)_9rem_5.5rem_7.5rem_5rem_3rem_8.5rem] items-center gap-3 rounded-lg border border-border bg-card px-4 transition-colors hover:bg-surface-2"
+              className={`grid h-12 grid-cols-[1.5rem_3.5rem_minmax(0,1fr)_9rem_5.5rem_7.5rem_5rem_3rem_8.5rem] items-center gap-3 rounded-lg border border-border px-4 transition-colors hover:bg-surface-2 ${
+                isActive ? "bg-surface-2" : "bg-card"
+              }`}
             >
               {/* Bulk-select checkbox (spec): agent-only, before the SUP-n column.
                   A raw checkbox rather than a Link so its click never bubbles to
