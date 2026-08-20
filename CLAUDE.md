@@ -21,6 +21,12 @@ Tailwind v4 + shadcn/Base UI)、`e2e` = Playwright。
 
 ## 作業スタイル
 
+- **メイン作業ディレクトリは常に main に留める(ブランチ切り替え禁止)**。
+  ブランチ作業・PR 作成・gh stack のブランチ操作はすべて
+  `git worktree add ../aaa-<topic> -b <branch>` の worktree 内で行う。
+  PreToolUse hook(scripts/guard-main-branch.sh)が構造的に強制する。
+  メインに untracked・未コミットの作業ファイルを残さない(一時物は
+  scratchpad へ、成果物は worktree 内で作る)
 - セッション開始時に `nightly-failure` ラベルの open issue(nightly の自動起票)を
   確認し、赤があれば新規作業よりトリアージを優先する
 - 要求されたことを要求された範囲で完了させれば十分。追加でやると良さそうなことを
