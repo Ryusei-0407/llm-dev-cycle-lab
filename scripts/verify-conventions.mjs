@@ -62,7 +62,8 @@ for (const file of allSpecFiles) {
 
 // Rule 3: every describe must carry a @feature-<name> tag.
 // Rule 4: mock-lane E2E per feature: at most 3 tests (happy 1 + failure 2).
-//         @pinned (refutation-pinned), @backend, @component, @visual are exempt
+//         @pinned (refutation-pinned), @disruption (interruption-pinned),
+//         @backend, @component, @visual are exempt
 //         (VRT は1テスト=1画面撮影で、画面数がテスト数を決める).
 // Rule 5: files with a @smoke test must pin the final structure (aria snapshot).
 // Rule 6: e2e/tests specs use test.step + snap (narrative traces + staged shots).
@@ -89,7 +90,7 @@ for (const file of allSpecFiles) {
   const isMockLane = !/@backend|@component|@visual/.test(describeTitle);
   const tests = [...source.matchAll(/^\s*test\(\s*["'`]([^"'`]+)["'`]/gm)];
   if (feature && isMockLane) {
-    const counted = tests.filter((t) => !/@pinned/.test(t[1])).length;
+    const counted = tests.filter((t) => !/@pinned|@disruption/.test(t[1])).length;
     featureCounts.set(feature, {
       count: (featureCounts.get(feature)?.count ?? 0) + counted,
       file,
