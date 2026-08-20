@@ -71,8 +71,11 @@ LLMへの「お願い」は忘れられる。守らせたいものは構造(hook
 - タグ: `@feature-<name>`(必須)/ `@smoke`(主経路)/ `@backend`(nightly)/
   `@component`(CT)/ `@quarantine`(flaky隔離、nightlyのみ・ゲート外)/
   `@pinned`(反証フェーズで固定されたテスト。E2E本数上限の免除根拠)/
+  `@disruption`(中断・破壊操作レビューで固定されたテスト。同じく上限免除)/
   `@visual`(VRT。1テスト=1画面撮影のため snap 段階スクショと本数上限の対象外。
   baseline は linux/CI 生成、更新は update-snapshots ワークフロー)
+- 中断系の検証(送信中リロード等)は in-flight の窓を運任せにしない: `page.route` の
+  遅延で応答を握って窓を決定的に固定してから中断を実行する
 - 幾何・ビューポート依存の検証(D&D、スクロール、仮想リストの可視窓、列の高さ)は
   表示データを `page.route` の固定レスポンスで構成する(モックレーン)。実DBの行数は
   worker 分離下でも自 worker のテスト・リトライで変動し、幾何を非決定にする
