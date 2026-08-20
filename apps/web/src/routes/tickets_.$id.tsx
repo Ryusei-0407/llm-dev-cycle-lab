@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { fetchMe } from "@/auth/api";
 import { AppShell } from "@/components/app-shell";
 import { DraftPanel } from "@/components/draft-panel";
@@ -101,14 +101,25 @@ function TicketDetailPage() {
   );
 
   const replyMutation = useMutation(
-    orpc.tickets.reply.mutationOptions({ onSuccess: invalidateDetail }),
+    orpc.tickets.reply.mutationOptions({
+      onSuccess: invalidateDetail,
+      // 既定の networkMode('online') はオフライン中の mutate を paused にする:
+      // エラーも送信中表示も出ないまま、タブを閉じると返信がサイレント消失する。
+      // 'always' なら fetch が即失敗して onError(reply-error + 入力保持)に落ち、
+      // ユーザーは失敗を知って再送できる(サポート返信は自動再送より明示失敗)。
+      networkMode: "always",
+    }),
   );
 
   const [body, setBody] = useState("");
   const [replyError, setReplyError] = useState<string | null>(null);
+  // isPending の pending 遷移は再レンダ経由で、同一タスク内の同期二連 dispatch
+  // (transport リトライ等でも起こる形)を止められない。同期 ref が唯一の防波堤。
+  const replyInFlight = useRef(false);
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
+    if (replyInFlight.current) return;
     const trimmed = body.trim();
     // Client-side guard on the empty reply: keep the thread untouched and show
     // the error without a server round trip (server still enforces min(1)).
@@ -117,11 +128,18 @@ function TicketDetailPage() {
       return;
     }
     setReplyError(null);
+    replyInFlight.current = true;
+    // 送信時点の生テキストを控える: 送信中に打たれた「次の文」を成功時の
+    // クリアで巻き添えにしない(変わっていないときだけ空にする)。
+    const submitted = body;
     replyMutation.mutate(
       { ticketId: id, body: trimmed },
       {
-        onSuccess: () => setBody(""),
+        onSuccess: () => setBody((current) => (current === submitted ? "" : current)),
         onError: () => setReplyError("Failed to send reply."),
+        onSettled: () => {
+          replyInFlight.current = false;
+        },
       },
     );
   };
