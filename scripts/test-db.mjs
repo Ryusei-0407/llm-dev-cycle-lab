@@ -1,20 +1,28 @@
 // Temporary PostgreSQL supplier for the tickets store lane (spec:
 // specs/database.md). Two modes, keyed on DATABASE_URL:
 //
-//   - provision (DATABASE_URL unset): docker run a throwaway postgres:18-alpine
-//     on a random free port with a unique name (--rm), wait for readiness,
-//     apply schema + seed, and return the connection URL. --teardown stops it.
+//   - provision (DATABASE_URL unset): start a throwaway postgres:18-alpine via
+//     Testcontainers (random port, unique name, Ryuk auto-reaping even on
+//     SIGKILL), wait for readiness, apply schema + seed, and return the
+//     connection URL. --teardown stops it.
 //   - reset (DATABASE_URL set, e.g. CI's postgres service container): apply
 //     schema + seed to that DB only, no container lifecycle.
+//
+// Provisioning rides Testcontainers so the docker daemon location is
+// abstracted (DOCKER_HOST / Testcontainers Cloud) and future service
+// containers reuse the same idiom. The public seam (url / containerName /
+// applySchemaAndSeed / teardown) is unchanged — worker-stack and the vitest
+// globalSetup consume it as before, and the llmlab-e2e-pg label is kept so
+// the global-teardown sweep stays a belt-and-suspenders backstop under Ryuk.
 //
 // applySchemaAndSeed(url) is idempotent (schema.sql drops the table first) so
 // vitest beforeEach can re-seed between cases. Also usable as a CLI:
 //   node scripts/test-db.mjs provision   # prints DATABASE_URL=... on stdout
 //   node scripts/test-db.mjs reset       # requires DATABASE_URL
 //   node scripts/test-db.mjs teardown --name <container>
+import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -31,20 +39,6 @@ const POSTGRES_DB = "postgres";
 
 async function docker(args, opts = {}) {
   return execFileAsync("docker", args, opts);
-}
-
-// A free ephemeral port. Racy in principle (the port could be taken between
-// close and docker binding it), but the window is tiny and each run picks a
-// fresh one, so parallel worktrees do not collide on a fixed port.
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const srv = net.createServer();
-    srv.on("error", reject);
-    srv.listen(0, "127.0.0.1", () => {
-      const { port } = srv.address();
-      srv.close(() => resolve(port));
-    });
-  });
 }
 
 async function readSql(name) {
@@ -91,46 +85,37 @@ async function waitForReady(url, { timeoutMs = 30000, intervalMs = 250 } = {}) {
 }
 
 // Start a throwaway postgres:18-alpine and return { url, containerName }.
-// Unique name + random host port so parallel worktrees never collide. --rm so
-// a `docker stop` (teardown) also removes it; nothing lingers. Every container
-// carries the llmlab-e2e-pg label so a sweep (docker stop --filter label=...)
-// can reliably clean up even if a launcher misses its stop signal.
+// Testcontainers owns the random port / unique name / readiness wait, and its
+// Ryuk reaper removes the container even when the owning process is SIGKILLed.
+// The llmlab-e2e-pg label is still applied so the existing global-teardown
+// sweep (docker stop --filter label=...) keeps working as a second backstop.
 export const LABEL = "llmlab-e2e-pg=1";
 
 export async function provision() {
-  const port = await freePort();
-  const containerName = `llmlab-pg-${process.pid}-${Math.floor(Math.random() * 1e6)}`;
-  await docker([
-    "run",
-    "-d",
-    "--rm",
-    "--name",
-    containerName,
-    "--label",
-    LABEL,
-    "-e",
-    `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`,
-    "-e",
-    `POSTGRES_USER=${POSTGRES_USER}`,
-    "-e",
-    `POSTGRES_DB=${POSTGRES_DB}`,
-    "-p",
-    `127.0.0.1:${port}:5432`,
-    POSTGRES_IMAGE,
-  ]);
-  const url = `postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${port}/${POSTGRES_DB}`;
+  const started = await new PostgreSqlContainer(POSTGRES_IMAGE)
+    .withDatabase(POSTGRES_DB)
+    .withUsername(POSTGRES_USER)
+    .withPassword(POSTGRES_PASSWORD)
+    .withLabels({ "llmlab-e2e-pg": "1" })
+    .start();
+  const containerName = started.getName().replace(/^\//, "");
+  const url = started.getConnectionUri();
   try {
-    await waitForReady(url);
+    // Testcontainers' wait strategy covers server start; the SELECT 1 poll
+    // stays as a cheap invariant that the URL really accepts our client.
+    await waitForReady(url, { timeoutMs: 10000 });
     await applySchemaAndSeed(url);
   } catch (err) {
-    await teardown(containerName).catch(() => {});
+    await started.stop().catch(() => {});
     throw err;
   }
   return { url, containerName };
 }
 
-// Stop (and, via --rm, remove) a provisioned container. Idempotent-ish: a
-// missing container is not an error worth failing teardown over.
+// Stop a provisioned container by name. docker CLI のままにする: teardown は
+// 別プロセス(worker-stack の exit バックストップ、CLI)からも名前だけで
+// 呼ばれるため、起動プロセス内の Testcontainers ハンドルに依存できない。
+// Ryuk が最終防衛線なので、ここが取りこぼしても残留しない。
 export async function teardown(containerName) {
   if (!containerName) return;
   await docker(["stop", containerName]).catch(() => {});
