@@ -4,8 +4,11 @@ allowBuilds:
   "@ffmpeg-installer/darwin-arm64": true
   "@ffmpeg-installer/linux-x64": true
   "@google/genai": false
+  # testcontainers→ssh2 の docker-over-ssh 用ネイティブ拡張。不使用なのでビルドしない
+  cpu-features: false
   esbuild: true
   protobufjs: false
+  ssh2: false
 minimumReleaseAgeExclude:
   - "@tanstack/charts@0.5.1"
   - "@tanstack/react-charts@0.5.1"
